@@ -22,7 +22,7 @@ const prompts: Record<SupportedLanguage, {
   greeting: string;
   askName: string;
   askReason: (name: string | null) => string;
-  askCallback: (ownerName: string) => string;
+  askCallback: (ownerName: string, hasCallerId: boolean) => string;
   askPhone: (ownerName: string) => string;
   askYesNo: string;
   askPhoneAgain: string;
@@ -33,7 +33,9 @@ const prompts: Record<SupportedLanguage, {
     greeting: 'Hello, you have reached Yazonis Secrettera, the virtual receptionist. I can take a message and arrange a callback.',
     askName: 'May I have your name, please?',
     askReason: (name) => `Thank you${name ? `, ${name}` : ''}. How can I help you today?`,
-    askCallback: (ownerName) => `Would you like ${ownerName} to call you back? Please answer yes or no.`,
+    askCallback: (ownerName, hasCallerId) => hasCallerId
+      ? `Would you like ${ownerName} to call you back on the number you're calling from?`
+      : `Would you like ${ownerName} to call you back?`,
     askPhone: (ownerName) => `What number should ${ownerName} call you back on?`,
     askYesNo: 'Please say yes if you would like a callback, or no if you do not.',
     askPhoneAgain: 'That does not look like a complete phone number. Please say the number including its country code.',
@@ -44,7 +46,9 @@ const prompts: Record<SupportedLanguage, {
     greeting: 'Hej och välkommen till Yazonis Secrettera, den virtuella receptionisten. Jag kan ta ett meddelande och ordna att du blir uppringd.',
     askName: 'Vad heter du?',
     askReason: (name) => `Tack${name ? `, ${name}` : ''}. Vad kan jag hjälpa dig med?`,
-    askCallback: (ownerName) => `Vill du att ${ownerName} ringer tillbaka till dig? Svara gärna ja eller nej.`,
+    askCallback: (ownerName, hasCallerId) => hasCallerId
+      ? `Vill du att ${ownerName} ringer tillbaka till numret du ringer från?`
+      : `Vill du att ${ownerName} ringer tillbaka till dig?`,
     askPhone: (ownerName) => `Vilket nummer ska ${ownerName} ringa tillbaka till?`,
     askYesNo: 'Säg ja om du vill bli uppringd, eller nej om du inte vill det.',
     askPhoneAgain: 'Det verkar inte vara ett fullständigt telefonnummer. Ange numret inklusive landskod.',
@@ -55,7 +59,9 @@ const prompts: Record<SupportedLanguage, {
     greeting: 'مرحباً، لقد وصلت إلى Yazonis Secrettera، موظف الاستقبال الافتراضي. يمكنني تسجيل رسالة وترتيب معاودة الاتصال بك.',
     askName: 'ما اسمك من فضلك؟',
     askReason: (name) => `شكراً لك${name ? ` يا ${name}` : ''}. كيف يمكنني مساعدتك اليوم؟`,
-    askCallback: (ownerName) => `هل ترغب أن يتصل بك ${ownerName}؟ يرجى الإجابة بنعم أو لا.`,
+    askCallback: (ownerName, hasCallerId) => hasCallerId
+      ? `هل ترغب أن يتصل بك ${ownerName} على الرقم الذي تتصل منه؟`
+      : `هل ترغب أن يتصل بك ${ownerName}؟`,
     askPhone: (ownerName) => `ما الرقم الذي تريد من ${ownerName} الاتصال بك عليه؟`,
     askYesNo: 'يرجى الإجابة بنعم إذا كنت ترغب في معاودة الاتصال، أو لا إذا لم ترغب بذلك.',
     askPhoneAgain: 'يبدو أن رقم الهاتف غير مكتمل. يرجى ذكر الرقم مع رمز الدولة.',
@@ -64,12 +70,12 @@ const prompts: Record<SupportedLanguage, {
   }
 };
 
-export function createConversation(language: SupportedLanguage = 'en'): ConversationTurn {
+export function createConversation(language: SupportedLanguage = 'en', callerPhone: string | null = null): ConversationTurn {
   const state: ConversationState = {
     language,
     stage: 'name',
     callerName: null,
-    callerPhone: null,
+    callerPhone: callerPhone && validPhone(callerPhone) ? callerPhone.slice(0, 40) : null,
     intent: null,
     message: null,
     callbackRequested: null
@@ -80,17 +86,17 @@ export function createConversation(language: SupportedLanguage = 'en'): Conversa
 
 function cleanName(value: string): string {
   return value.trim()
-    .replace(/^(my name is|i am|i'm|this is|jag heter|mitt namn är|jag är|اسمي|أنا)\\s+/iu, '')
+    .replace(/^(my name is|i am|i'm|this is|jag heter|mitt namn är|jag är|اسمي|أنا)\s+/iu, '')
     .replace(/[.!?،،]+$/u, '')
     .slice(0, 100);
 }
 
 function classifyIntent(value: string): string {
-  if (/\\b(appointment|book|booking|reschedule|möte|boka|omboka|موعد|حجز)\\b/iu.test(value)) return 'appointment';
-  if (/\\b(price|pricing|cost|pris|kostar|سعر|تكلفة)\\b/iu.test(value)) return 'pricing';
-  if (/\\b(open|opening hours|hours|öppet|öppettider|مفتوح|ساعات العمل)\\b/iu.test(value)) return 'opening_hours';
-  if (/\\b(address|location|directions|adress|hitta|vägbeskrivning|عنوان|موقع)\\b/iu.test(value)) return 'location';
-  if (/\\b(speak|talk|reach|contact|prata|tala|kontakta|أتحدث|التواصل)\\b/iu.test(value)) return 'speak_to_owner';
+  if (/\b(appointment|book|booking|reschedule|möte|boka|omboka|موعد|حجز)\b/iu.test(value)) return 'appointment';
+  if (/\b(price|pricing|cost|pris|kostar|سعر|تكلفة)\b/iu.test(value)) return 'pricing';
+  if (/\b(open|opening hours|hours|öppet|öppettider|مفتوح|ساعات العمل)\b/iu.test(value)) return 'opening_hours';
+  if (/\b(address|location|directions|adress|hitta|vägbeskrivning|عنوان|موقع)\b/iu.test(value)) return 'location';
+  if (/\b(speak|talk|reach|contact|prata|tala|kontakta|أتحدث|التواصل)\b/iu.test(value)) return 'speak_to_owner';
   return 'general';
 }
 
@@ -103,8 +109,8 @@ function isNo(value: string): boolean {
 }
 
 function validPhone(value: string): boolean {
-  const digits = value.replace(/\\D/gu, '');
-  return digits.length >= 7 && digits.length <= 15 && /^[+\\d(][\\d\\s().+-]*$/u.test(value.trim());
+  const digits = value.replace(/\D/gu, '');
+  return digits.length >= 7 && digits.length <= 15 && /^[+\d(][\d\s().+-]*$/u.test(value.trim());
 }
 
 export function advanceConversation(current: ConversationState, callerText: string, ownerName = 'Yazoniii'): ConversationTurn {
@@ -128,12 +134,16 @@ export function advanceConversation(current: ConversationState, callerText: stri
     state.message = text;
     state.intent = classifyIntent(text);
     state.stage = 'callback';
-    return { state, reply: copy.askCallback(ownerName), completed: false };
+    return { state, reply: copy.askCallback(ownerName, Boolean(state.callerPhone)), completed: false };
   }
 
   if (state.stage === 'callback') {
     if (isYes(text)) {
       state.callbackRequested = true;
+      if (state.callerPhone) {
+        state.stage = 'complete';
+        return { state, reply: copy.callbackConfirmation(ownerName, state.callerPhone), completed: true };
+      }
       state.stage = 'phone';
       return { state, reply: copy.askPhone(ownerName), completed: false };
     }
