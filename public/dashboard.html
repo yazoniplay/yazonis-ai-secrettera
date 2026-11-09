@@ -30,11 +30,25 @@ body{background:transparent;isolation:isolate}
 /* Keep dashboard surfaces readable while letting the sky show through */
 .panel{background:linear-gradient(145deg,#ffffff1c,#ffffff0b);backdrop-filter:blur(18px);border-color:#ffffff2b}.chatlog{background:linear-gradient(145deg,#ffffff18,#ffffff0a);border-color:#ffffff28;backdrop-filter:blur(14px)}.bubble.assistant{background:#ffffff1b;border-color:#ffffff28;color:var(--text)}.historyitem{box-shadow:inset 0 1px #ffffff0b}
 .loginwrap{background:#080a08a8}
+.modalwrap{position:fixed;inset:0;z-index:20;display:grid;place-items:center;padding:20px;background:#080a08b8;backdrop-filter:blur(10px);opacity:1;transition:opacity .18s ease}
+.modalwrap.hidden{display:none}
+.confirmmodal{width:min(420px,100%);padding:24px;border:1px solid #ffffff30;border-radius:18px;background:linear-gradient(145deg,#252b22,#171b16);box-shadow:0 24px 80px #0009}
+.confirmmodal h2{font-size:19px;margin:0 0 8px;letter-spacing:-.03em}
+.confirmmodal p{margin:0;color:var(--muted);font-size:13px;line-height:1.6}
+.modalactions{display:flex;justify-content:flex-end;gap:9px;margin-top:22px}
+.action.danger-solid{background:#a7433b;color:#fff;border-color:#c65d54}
+.action.danger-solid:hover{background:#bd5148;border-color:#e58b83}
+body.modal-open{overflow:hidden}
+
 @media(prefers-reduced-motion:reduce){.sky,.sky-stars,.celestial,.moon{transition:none}.sky-cloud{animation:none}}
 </style>
 </head>
 <body>
 <div class="sky" id="sky" aria-hidden="true"><div class="sky-stars"></div><div class="celestial"></div><div class="moon"></div><div class="sky-cloud"></div><div class="sky-cloud two"></div></div>
+<div class="modalwrap hidden" id="confirmmodal" role="dialog" aria-modal="true" aria-labelledby="confirmtitle" aria-describedby="confirmdescription">
+ <div class="confirmmodal"><h2 id="confirmtitle">Delete conversation?</h2><p id="confirmdescription">This permanently deletes the saved test conversation and all its messages. This action cannot be undone.</p>
+ <div class="modalactions"><button class="action" type="button" id="canceldelete">Cancel</button><button class="action danger-solid" type="button" id="confirmdelete">Delete conversation</button></div></div>
+</div>
 <div class="loginwrap" id="loginwrap"><form class="login" id="loginform"><div class="brand"><span class="mark">YS</span><span>YAZONIS <span style="color:var(--muted);font-weight:400">SECRETTERA</span></span></div><h2>Welcome back.</h2><p>Enter your private dashboard access code to manage your availability.</p><input id="accesscode" type="password" autocomplete="current-password" placeholder="Access code" required minlength="1"><button class="action primary" type="submit">Unlock dashboard</button><div class="loginerror" id="loginerror"></div></form></div>
 <main class="shell">
 <header class="top"><div class="brand"><span class="mark">YS</span><span>YAZONIS <span style="color:var(--muted);font-weight:400">SECRETTERA</span></span></div><div class="topright">YAZONIS SECRETTERA · CONTROL CENTRE</div></header>
@@ -132,7 +146,14 @@ async function loadConversations(){try{const data=await api('/api/conversations'
 $('#startconversation').addEventListener('click',async()=>{try{const data=await api('/api/conversations',{method:'POST',body:JSON.stringify({language:$('#simlanguage').value,callerPhone:$('#simcallerphone').value.trim()||null})});activeConversationId=data.conversationId;$('#chatlog').replaceChildren();addBubble('assistant',data.reply);$('#chatinput').disabled=false;$('#chatsend').disabled=false;$('#chatinput').focus()}catch(e){showNotice(e.message)}});
 $('#chatform').addEventListener('submit',async e=>{e.preventDefault();const text=$('#chatinput').value.trim();if(!text||!activeConversationId)return;$('#chatinput').value='';$('#chatsend').disabled=true;try{const data=await api('/api/conversations/'+activeConversationId+'/messages',{method:'POST',body:JSON.stringify({text})});addBubble('caller',text);addBubble('assistant',data.reply);await loadConversations();if(data.completed){$('#chatinput').disabled=true;$('#chatsend').disabled=true}else{$('#chatinput').focus()}}catch(err){$('#chatinput').value=text;showNotice(err.message)}finally{if(!$('#chatinput').disabled)$('#chatsend').disabled=false}});
 $('#refreshconversations').addEventListener('click',loadConversations);
-$('#conversationhistory').addEventListener('click',async e=>{const button=e.target.closest('[data-delete-id]');if(!button)return;const id=button.dataset.deleteId;if(!window.confirm('Delete this test conversation and its messages? This cannot be undone.'))return;button.disabled=true;try{await api('/api/conversations/'+id,{method:'DELETE'});if(activeConversationId===id){activeConversationId=null;$('#chatlog').replaceChildren();const note=document.createElement('div');note.className='sub';note.textContent='Conversation deleted. Start a new test when ready.';$('#chatlog').append(note);$('#chatinput').disabled=true;$('#chatsend').disabled=true}await loadConversations();showNotice('Test conversation deleted.')}catch(err){button.disabled=false;showNotice(err.message)}});
+let pendingDeleteId=null,pendingDeleteButton=null;
+function openDeleteModal(id,button){pendingDeleteId=id;pendingDeleteButton=button;$('#confirmmodal').classList.remove('hidden');document.body.classList.add('modal-open');$('#confirmdelete').focus()}
+function closeDeleteModal(){pendingDeleteId=null;$('#confirmmodal').classList.add('hidden');document.body.classList.remove('modal-open');if(pendingDeleteButton&&!pendingDeleteButton.disabled)pendingDeleteButton.focus();pendingDeleteButton=null}
+$('#canceldelete').addEventListener('click',closeDeleteModal);
+$('#confirmmodal').addEventListener('click',e=>{if(e.target===$('#confirmmodal'))closeDeleteModal()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#confirmmodal').classList.contains('hidden'))closeDeleteModal()});
+$('#conversationhistory').addEventListener('click',e=>{const button=e.target.closest('[data-delete-id]');if(!button)return;openDeleteModal(button.dataset.deleteId,button)});
+$('#confirmdelete').addEventListener('click',async()=>{const id=pendingDeleteId;if(!id)return;const button=pendingDeleteButton;$('#confirmdelete').disabled=true;$('#canceldelete').disabled=true;try{await api('/api/conversations/'+id,{method:'DELETE'});closeDeleteModal();if(activeConversationId===id){activeConversationId=null;$('#chatlog').replaceChildren();const note=document.createElement('div');note.className='sub';note.textContent='Conversation deleted. Start a new test when ready.';$('#chatlog').append(note);$('#chatinput').disabled=true;$('#chatsend').disabled=true}await loadConversations();showNotice('Test conversation deleted.')}catch(err){showNotice(err.message)}finally{$('#confirmdelete').disabled=false;$('#canceldelete').disabled=false;if(button)button.disabled=false}});
 
 updateSky();setInterval(updateSky,60000);localClock();setInterval(localClock,1000);setInterval(tick,1000);setInterval(refresh,15000);setInterval(()=>{if($('#loginwrap').classList.contains('hidden'))loadConversations()},15000);setInterval(heartbeat,25000);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')heartbeat()});window.addEventListener('online',heartbeat);api('/api/auth/session').then(async()=>{$('#loginwrap').classList.add('hidden');await heartbeat();await refresh();await loadConversations()}).catch(()=>$('#loginwrap').classList.remove('hidden'));
 </script></body></html>
