@@ -27,19 +27,19 @@ export interface ReceptionPhrases {
 
 const phrases: Record<SupportedLanguage, ReceptionPhrases> = {
   en: {
-    greeting: 'Hello, you have reached Nour. How can I help?',
+    greeting: 'Hello, you have reached Yazonis Secrettera. How can I help?',
     unavailable: 'The person you are trying to reach is unavailable right now.',
     busy: 'They are busy at the moment.',
     takeMessage: 'Would you like to leave a message or request a callback?'
   },
   sv: {
-    greeting: 'Hej, du har kommit till Nour. Hur kan jag hjälpa dig?',
+    greeting: 'Hej, du har kommit till Yazonis Secrettera. Hur kan jag hjälpa dig?',
     unavailable: 'Personen du söker är inte tillgänglig just nu.',
     busy: 'Personen är upptagen för tillfället.',
     takeMessage: 'Vill du lämna ett meddelande eller be om att bli uppringd?'
   },
   ar: {
-    greeting: 'مرحباً، لقد وصلت إلى نور. كيف يمكنني مساعدتك؟',
+    greeting: 'مرحباً، لقد وصلت إلى Yazonis Secrettera. كيف يمكنني مساعدتك؟',
     unavailable: 'الشخص الذي تحاول التواصل معه غير متاح حالياً.',
     busy: 'الشخص مشغول حالياً.',
     takeMessage: 'هل ترغب في ترك رسالة أو طلب معاودة الاتصال؟'
