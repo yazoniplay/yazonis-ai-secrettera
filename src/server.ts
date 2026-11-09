@@ -226,11 +226,18 @@ app.delete('/api/conversations/:id', async (request, reply) => {
   if (!hasSession(request)) return reply.code(401).send({ error: 'Unauthorized' });
   const params = conversationIdParams.safeParse(request.params);
   if (!params.success) return reply.code(400).send({ error: 'Invalid conversation ID.' });
+  // Messages reference the conversation without ON DELETE CASCADE, so remove them first.
+  const { error: messagesError } = await supabase.from('receptionist_messages')
+    .delete().eq('conversation_id', params.data.id);
+  if (messagesError) {
+    app.log.error({ error: messagesError }, 'Could not delete conversation messages');
+    return reply.code(503).send({ error: 'Could not delete the conversation messages.' });
+  }
   const { data, error } = await supabase.from('receptionist_conversations')
     .delete().eq('id', params.data.id).select('id').maybeSingle();
   if (error) {
     app.log.error({ error }, 'Could not delete receptionist conversation');
-    return reply.code(503).send({ error: 'Could not delete this conversation. Check the database delete permission.' });
+    return reply.code(503).send({ error: 'Could not delete this conversation.' });
   }
   if (!data) return reply.code(404).send({ error: 'Conversation was not found or database permissions blocked the delete.' });
   return { deleted: true, conversationId: data.id };
