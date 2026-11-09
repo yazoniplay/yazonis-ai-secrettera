@@ -32,6 +32,7 @@ button,input{font:inherit}button{cursor:pointer}.shell{max-width:1120px;margin:a
 </main>
 <script>
 const $=s=>document.querySelector(s);let statusData=null,refreshing=false;
+async function heartbeat(){if(document.visibilityState!=='visible'||!navigator.onLine||!$('#loginwrap').classList.contains('hidden'))return;try{await api('/api/presence/heartbeat',{method:'POST',body:'{}'});$('#connection').textContent='Live · phone connected'}catch(e){$('#connection').textContent='Offline'}}
 const labels={available:'Available',busy:'Busy',unavailable:'Unavailable',after_hours:'After hours',confirmation_expired:'Confirmation expired',offline:'Offline · unavailable'};
 function localClock(){const d=new Date();$('#clock').textContent=new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Stockholm',hour:'2-digit',minute:'2-digit',second:'2-digit'}).format(d);$('#date').textContent=new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Stockholm',weekday:'long',day:'numeric',month:'long',year:'numeric'}).format(d)}
 function showNotice(msg){$('#notice').textContent=msg;$('#notice').classList.add('show');setTimeout(()=>$('#notice').classList.remove('show'),4500)}
