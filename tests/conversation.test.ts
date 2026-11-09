@@ -36,6 +36,22 @@ describe('receptionist conversation', () => {
     expect(turn.reply).not.toContain('Sam');
   });
 
+
+  it('uses incoming caller ID automatically and never asks the caller to repeat it', () => {
+    let turn = createConversation('en', '+46701234567');
+    expect(turn.state.callerPhone).toBe('+46701234567');
+    turn = advanceConversation(turn.state, 'Morgan');
+    turn = advanceConversation(turn.state, 'I need to discuss my appointment');
+    expect(turn.reply).toContain('number you\'re calling from');
+    turn = advanceConversation(turn.state, 'Yes');
+    expect(turn.completed).toBe(true);
+    expect(turn.state.stage).toBe('complete');
+    expect(turn.state.callerPhone).toBe('+46701234567');
+    expect(turn.reply).toContain('Yazoniii');
+    expect(turn.reply).toContain('+46701234567');
+    expect(turn.reply).not.toContain('What number');
+  });
+
   it('switches to Swedish when the caller speaks Swedish', () => {
     let turn = createConversation('en');
     turn = advanceConversation(turn.state, 'Jag heter Lina');
