@@ -6,6 +6,7 @@ import { readFile } from 'node:fs/promises';
 import { z } from 'zod';
 import { config } from './config.js';
 import { evaluateAvailability, type ManualStatus } from './availability.js';
+import { detectLanguage, getReceptionPhrases, type SupportedLanguage } from './language.js';
 
 const app = Fastify({ logger: true });
 const supabase = createClient(config.SUPABASE_URL, config.SUPABASE_PUBLISHABLE_KEY, {
@@ -14,7 +15,8 @@ const supabase = createClient(config.SUPABASE_URL, config.SUPABASE_PUBLISHABLE_K
 });
 const statusBody = z.object({ status: z.enum(['available', 'busy', 'unavailable']) });
 const loginBody = z.object({ code: z.string().min(1).max(256) });
-type SettingsRow = { manual_status: ManualStatus; last_confirmed_at: string | null; updated_at: string };
+const languageBody = z.object({ text: z.string().min(1).max(2000), fallback: z.enum(['en', 'sv', 'ar']).optional() });
+type SettingsRow = { manual_status: ManualStatus; last_confirmed_at: string | null; last_seen_at: string | null; updated_at: string };
 const SESSION_COOKIE = 'nour_session';
 const SESSION_TTL_SECONDS = 12 * 60 * 60;
 let loginFailures = 0;
@@ -82,19 +84,19 @@ app.post('/api/auth/logout', async (_request, reply) => {
 });
 
 async function readSettings(): Promise<SettingsRow> {
-  const { data, error } = await supabase.from('receptionist_settings').select('manual_status,last_confirmed_at,updated_at').eq('id', 'primary').single();
+  const { data, error } = await supabase.from('receptionist_settings').select('manual_status,last_confirmed_at,last_seen_at,updated_at').eq('id', 'primary').single();
   if (error || !data) { app.log.error({ error }, 'Could not read receptionist settings'); throw new Error('Availability storage is unavailable'); }
   return data as SettingsRow;
 }
 async function writeSettings(values: Partial<SettingsRow>): Promise<SettingsRow> {
-  const { data, error } = await supabase.from('receptionist_settings').update({ ...values, updated_at: new Date().toISOString() }).eq('id', 'primary').select('manual_status,last_confirmed_at,updated_at').single();
+  const { data, error } = await supabase.from('receptionist_settings').update({ ...values, updated_at: new Date().toISOString() }).eq('id', 'primary').select('manual_status,last_confirmed_at,last_seen_at,updated_at').single();
   if (error || !data) { app.log.error({ error }, 'Could not update receptionist settings'); throw new Error('Could not update availability'); }
   return data as SettingsRow;
 }
 app.get('/api/status', async (_request, reply) => {
   try {
     const settings = await readSettings();
-    return { ...evaluateAvailability({ manualStatus: settings.manual_status, lastConfirmedAt: settings.last_confirmed_at }), manualStatus: settings.manual_status, updatedAt: settings.updated_at };
+    return { ...evaluateAvailability({ manualStatus: settings.manual_status, lastConfirmedAt: settings.last_confirmed_at, lastSeenAt: settings.last_seen_at }), manualStatus: settings.manual_status, lastSeenAt: settings.last_seen_at, updatedAt: settings.updated_at };
   } catch { return reply.code(503).send({ error: 'Availability service temporarily unavailable' }); }
 });
 app.put('/api/status', async (request, reply) => {
@@ -103,17 +105,36 @@ app.put('/api/status', async (request, reply) => {
   if (!parsed.success) return reply.code(400).send({ error: 'Invalid status. Use available, busy or unavailable.' });
   try {
     const now = new Date().toISOString();
-    const settings = await writeSettings({ manual_status: parsed.data.status, last_confirmed_at: parsed.data.status === 'available' ? now : null });
-    return { ...evaluateAvailability({ manualStatus: settings.manual_status, lastConfirmedAt: settings.last_confirmed_at }), manualStatus: settings.manual_status, updatedAt: settings.updated_at };
+    const settings = await writeSettings({ manual_status: parsed.data.status, last_confirmed_at: parsed.data.status === 'available' ? now : null, last_seen_at: parsed.data.status === 'available' ? now : undefined });
+    return { ...evaluateAvailability({ manualStatus: settings.manual_status, lastConfirmedAt: settings.last_confirmed_at, lastSeenAt: settings.last_seen_at }), manualStatus: settings.manual_status, lastSeenAt: settings.last_seen_at, updatedAt: settings.updated_at };
   } catch { return reply.code(503).send({ error: 'Could not update availability' }); }
 });
 app.post('/api/status/confirm', async (request, reply) => {
   if (!isAuthorized(request)) return reply.code(401).send({ error: 'Unauthorized' });
   try {
-    const settings = await writeSettings({ last_confirmed_at: new Date().toISOString() });
-    return { ...evaluateAvailability({ manualStatus: settings.manual_status, lastConfirmedAt: settings.last_confirmed_at }), manualStatus: settings.manual_status, updatedAt: settings.updated_at };
+    const now = new Date().toISOString();
+    const settings = await writeSettings({ last_confirmed_at: now, last_seen_at: now });
+    return { ...evaluateAvailability({ manualStatus: settings.manual_status, lastConfirmedAt: settings.last_confirmed_at, lastSeenAt: settings.last_seen_at }), manualStatus: settings.manual_status, lastSeenAt: settings.last_seen_at, updatedAt: settings.updated_at };
   } catch { return reply.code(503).send({ error: 'Could not confirm availability' }); }
 });
+app.post('/api/presence/heartbeat', async (request, reply) => {
+  if (!hasSession(request)) return reply.code(401).send({ error: 'Unauthorized' });
+  try {
+    const settings = await writeSettings({ last_seen_at: new Date().toISOString() });
+    return { ok: true, lastSeenAt: settings.last_seen_at };
+  } catch {
+    return reply.code(503).send({ error: 'Could not update device presence' });
+  }
+});
+
+app.post('/api/language/detect', async (request, reply) => {
+  if (!isAuthorized(request)) return reply.code(401).send({ error: 'Unauthorized' });
+  const parsed = languageBody.safeParse(request.body);
+  if (!parsed.success) return reply.code(400).send({ error: 'Provide text and an optional language fallback.' });
+  const language: SupportedLanguage = detectLanguage(parsed.data.text, parsed.data.fallback ?? 'en');
+  return { language, supportedLanguages: ['en', 'sv', 'ar'], responses: getReceptionPhrases(language) };
+});
+
 app.setErrorHandler((error, _request, reply) => { app.log.error(error); return reply.code(500).send({ error: 'Internal server error' }); });
 try { await app.listen({ port: config.PORT, host: config.HOST }); }
 catch (error) { app.log.error(error); process.exit(1); }
