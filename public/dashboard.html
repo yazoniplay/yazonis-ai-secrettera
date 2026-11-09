@@ -33,7 +33,8 @@ body{background:transparent;isolation:isolate}
 @media(prefers-reduced-motion:reduce){.sky,.sky-stars,.celestial,.moon{transition:none}.sky-cloud{animation:none}}
 </style>
 </head>
-<body>\n<div class="sky" id="sky" aria-hidden="true"><div class="sky-stars"></div><div class="celestial"></div><div class="moon"></div><div class="sky-cloud"></div><div class="sky-cloud two"></div></div>
+<body>
+<div class="sky" id="sky" aria-hidden="true"><div class="sky-stars"></div><div class="celestial"></div><div class="moon"></div><div class="sky-cloud"></div><div class="sky-cloud two"></div></div>
 <div class="loginwrap" id="loginwrap"><form class="login" id="loginform"><div class="brand"><span class="mark">YS</span><span>YAZONIS <span style="color:var(--muted);font-weight:400">SECRETTERA</span></span></div><h2>Welcome back.</h2><p>Enter your private dashboard access code to manage your availability.</p><input id="accesscode" type="password" autocomplete="current-password" placeholder="Access code" required minlength="1"><button class="action primary" type="submit">Unlock dashboard</button><div class="loginerror" id="loginerror"></div></form></div>
 <main class="shell">
 <header class="top"><div class="brand"><span class="mark">YS</span><span>YAZONIS <span style="color:var(--muted);font-weight:400">SECRETTERA</span></span></div><div class="topright">YAZONIS SECRETTERA · CONTROL CENTRE</div></header>
@@ -60,7 +61,8 @@ body{background:transparent;isolation:isolate}
 <div class="footer"><span>YAZONIS SECRETTERA · PRIVATE DASHBOARD</span><span id="updated">Waiting for first sync</span></div>
 </main>
 <script>
-const $=s=>document.querySelector(s);let statusData=null,refreshing=false;\n
+const $=s=>document.querySelector(s);let statusData=null,refreshing=false;
+
 const skyPhases=[
 {start:0,end:5,top:'#07101f',mid:'#172b46',low:'#273d58',glow:'#263d5b',stars:1,sun:0,moon:1,label:'Night'},
 {start:5,end:7,top:'#283b59',mid:'#b06e70',low:'#f1b17e',glow:'#ffd09a',stars:.35,sun:.85,moon:0,label:'Sunrise'},
