@@ -83,7 +83,7 @@ function classifyIntent(value: string): string {
 function isUrgent(value: string): boolean {
   const explicit = /\b(urgent|urgently|emergency|asap|immediately|right now|critical|brådskande|akut|genast|omedelbart|nu direkt)\b|عاجل|طارئ|فوراً|حالاً/iu.test(value);
   const family = /\b(mom|mum|mother|dad|father|parent|parents|mamma|morsa|pappa|förälder|föräldrar)\b|أمي|أبي|والدتي|والدي/iu.test(value);
-  const request = /\b(need|needs|trying|wants|want|speak|talk|call|contact|tell|reach|important|must)\b|\b(behöver|måste|prata|ringa|kontakta|viktigt)\b|يريد|أحتاج|اتصل|أخبر/iu.test(value);
+  const request = /\b(need|needs|trying|wants|want|speak|talk|call|calling|called|contact|tell|reach|important|must)\b|\b(behöver|måste|prata|ringa|kontakta|viktigt)\b|يريد|أحتاج|اتصل|أخبر/iu.test(value);
   return explicit || (family && request);
 }
 function isYes(value: string): boolean { return /^(yes|yeah|yep|ja|japp|absolut|gärna|نعم|أجل|أكيد)$/iu.test(value.trim().replace(/[.!؟?]/gu, '')); }
