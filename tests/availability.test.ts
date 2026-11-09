@@ -6,6 +6,7 @@ describe('evaluateAvailability', () => {
     const result = evaluateAvailability({
       manualStatus: 'available',
       lastConfirmedAt: '2026-11-09T14:55:00.000Z',
+      lastSeenAt: '2026-11-09T14:59:30.000Z',
       now: new Date('2026-11-09T15:00:00.000Z')
     });
     expect(result.available).toBe(true);
@@ -26,6 +27,7 @@ describe('evaluateAvailability', () => {
     const result = evaluateAvailability({
       manualStatus: 'available',
       lastConfirmedAt: '2026-11-09T15:00:00.000Z',
+      lastSeenAt: '2026-11-09T15:09:30.000Z',
       now: new Date('2026-11-09T15:10:00.000Z')
     });
     expect(result.available).toBe(false);
@@ -46,8 +48,30 @@ describe('evaluateAvailability', () => {
     const result = evaluateAvailability({
       manualStatus: 'available',
       lastConfirmedAt: '2026-11-09T15:05:00.000Z',
+      lastSeenAt: '2026-11-09T15:00:00.000Z',
       now: new Date('2026-11-09T15:00:00.000Z')
     });
     expect(result.available).toBe(false);
   });
+  it('marks the owner offline when the phone heartbeat becomes stale', () => {
+    const result = evaluateAvailability({
+      manualStatus: 'available',
+      lastConfirmedAt: '2026-11-09T14:59:00.000Z',
+      lastSeenAt: '2026-11-09T14:58:00.000Z',
+      now: new Date('2026-11-09T15:00:00.000Z')
+    });
+    expect(result.available).toBe(false);
+    expect(result.status).toBe('offline');
+  });
+
+  it('keeps a recently seen owner online before the presence timeout', () => {
+    const result = evaluateAvailability({
+      manualStatus: 'available',
+      lastConfirmedAt: '2026-11-09T14:59:00.000Z',
+      lastSeenAt: '2026-11-09T14:59:30.000Z',
+      now: new Date('2026-11-09T15:00:00.000Z')
+    });
+    expect(result.available).toBe(true);
+  });
+
 });
