@@ -7,6 +7,7 @@ const schema = z.object({
   SUPABASE_URL: z.string().url(),
   SUPABASE_PUBLISHABLE_KEY: z.string().min(1),
   DASHBOARD_API_KEY: z.string().min(24),
+  DASHBOARD_ACCESS_CODE: z.string().min(24),
   CORS_ORIGIN: z.string().default('http://localhost:3001')
 });
 
