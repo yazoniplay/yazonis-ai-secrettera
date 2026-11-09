@@ -99,7 +99,7 @@ export function advanceConversation(current: ConversationState, callerText: stri
   const copy = prompts[language];
   const state: ConversationState = { ...current, language };
   if (!text) return { state, reply: copy.askReason(state.callerName), completed: false };
-  if (state.stage === 'complete') return { state, reply: state.callbackRequested && state.callerPhone ? copy.completedMessage(ownerName, state.callerName, state.priority === 'urgent', state.message, state.callerPhone, state.callbackRequested) : copy.completedMessage(ownerName, state.callerName, state.priority === 'urgent', state.message, state.callerPhone, state.callbackRequested), completed: true };
+  if (state.stage === 'complete') return { state, reply: copy.completedMessage(ownerName, state.callerName, state.priority === 'urgent', state.message, state.callerPhone, state.callbackRequested), completed: true };
   if (state.stage === 'name') {
     const familyIdentity = /\b(i am|i'm|this is|it's|it is|calling|jag är|det är|ringer som)\b.{0,45}\b(mom|mum|mother|dad|father|sister|brother|parent|mamma|morsa|pappa|syster|bror|förälder)\b|\b(your|his|her|hans|hennes)\s+(mom|mum|mother|dad|father|sister|brother|mamma|pappa|syster|bror)\b|أنا (أمك|أبوك|والدتك|والدك|أختك|أخوك)/iu.test(text);
     state.callerName = familyIdentity ? 'Yazoniii family member' : cleanName(text) || null;
@@ -110,7 +110,7 @@ export function advanceConversation(current: ConversationState, callerText: stri
   if (state.stage === 'reason') {
     state.message = text;
     state.intent = classifyIntent(text);
-    state.priority = isUrgent(text) ? 'urgent' : 'normal';
+    state.priority = state.priority === 'urgent' || isUrgent(text) ? 'urgent' : 'normal';
     state.stage = 'callback';
     return { state, reply: copy.askCallback(ownerName, Boolean(state.callerPhone), state.priority === 'urgent'), completed: false };
   }
@@ -119,7 +119,7 @@ export function advanceConversation(current: ConversationState, callerText: stri
       state.callbackRequested = true;
       if (state.callerPhone) {
         state.stage = 'complete';
-        return { state, reply: copy.callbackConfirmation(ownerName, state.callerPhone, state.callerName, state.priority === 'urgent'), completed: true };
+        return { state, reply: copy.completedMessage(ownerName, state.callerName, state.priority === 'urgent', state.message, state.callerPhone, state.callbackRequested), completed: true };
       }
       state.stage = 'phone';
       return { state, reply: copy.askPhone(ownerName), completed: false };
