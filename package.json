@@ -2,6 +2,7 @@
   "name": "nour-receptionist",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "description": "Cloud-first personal AI receptionist",
   "engines": { "node": ">=22" },
   "scripts": {
