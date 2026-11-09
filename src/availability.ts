@@ -3,13 +3,15 @@ import { DateTime } from 'luxon';
 export const TIME_ZONE = 'Europe/Stockholm';
 export const CONFIRMATION_TTL_MINUTES = 10;
 export const CUTOFF_HOUR = 18;
+export const PRESENCE_TIMEOUT_SECONDS = 75;
 
 export type ManualStatus = 'available' | 'busy' | 'unavailable';
-export type EffectiveStatus = ManualStatus | 'after_hours' | 'confirmation_expired';
+export type EffectiveStatus = ManualStatus | 'after_hours' | 'confirmation_expired' | 'offline';
 
 export interface AvailabilityInput {
   manualStatus: ManualStatus;
   lastConfirmedAt: string | null;
+  lastSeenAt?: string | null;
   now?: Date;
 }
 
@@ -35,6 +37,31 @@ export function evaluateAvailability(input: AvailabilityInput): AvailabilityResu
       lastConfirmedAt: input.lastConfirmedAt,
       confirmationExpiresAt: null
     };
+  }
+
+  if (input.manualStatus === 'available') {
+    if (!input.lastSeenAt) {
+      return {
+        status: 'offline',
+        available: false,
+        reason: 'Your device is not currently connected. Reopen the dashboard on your phone to restore presence.',
+        localTime: local.toISO() ?? '',
+        lastConfirmedAt: input.lastConfirmedAt,
+        confirmationExpiresAt: null
+      };
+    }
+    const seen = DateTime.fromISO(input.lastSeenAt, { setZone: true });
+    const presenceAgeSeconds = seen.isValid ? now.diff(seen, 'seconds').seconds : Infinity;
+    if (!seen.isValid || presenceAgeSeconds < 0 || presenceAgeSeconds > PRESENCE_TIMEOUT_SECONDS) {
+      return {
+        status: 'offline',
+        available: false,
+        reason: 'Your device has not checked in recently. Nour has marked you unavailable.',
+        localTime: local.toISO() ?? '',
+        lastConfirmedAt: input.lastConfirmedAt,
+        confirmationExpiresAt: null
+      };
+    }
   }
 
   if (input.manualStatus !== 'available') {
