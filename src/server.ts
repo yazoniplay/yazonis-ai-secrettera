@@ -222,6 +222,18 @@ app.get('/api/conversations', async (request, reply) => {
   return { conversations: data ?? [] };
 });
 
+app.delete('/api/conversations/:id', async (request, reply) => {
+  if (!hasSession(request)) return reply.code(401).send({ error: 'Unauthorized' });
+  const params = conversationIdParams.safeParse(request.params);
+  if (!params.success) return reply.code(400).send({ error: 'Invalid conversation ID.' });
+  const { error } = await supabase.from('receptionist_conversations').delete().eq('id', params.data.id);
+  if (error) {
+    app.log.error({ error }, 'Could not delete receptionist conversation');
+    return reply.code(503).send({ error: 'Could not delete this conversation.' });
+  }
+  return { deleted: true, conversationId: params.data.id };
+});
+
 app.get('/api/conversations/:id', async (request, reply) => {
   if (!hasSession(request)) return reply.code(401).send({ error: 'Unauthorized' });
   const params = conversationIdParams.safeParse(request.params);
