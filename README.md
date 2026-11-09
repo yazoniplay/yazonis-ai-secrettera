@@ -17,16 +17,18 @@ This milestone establishes the backend contract and availability rules. Telephon
 ## Stack
 - Node.js 22 + TypeScript + Fastify
 - Supabase Postgres for persistent state
+- Supabase publishable API key plus a private request credential, enforced by Row Level Security
 - Vitest for tests
-- Render for always-on hosting (deployment configuration comes later)
+- Render for hosting
 
 ## Setup
 1. Copy `.env.example` to `.env`.
-2. Create a Supabase project and run `supabase/migrations/0001_initial.sql`.
-3. Set `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `DASHBOARD_API_KEY`.
-4. Run `npm install`, `npm run dev`, and `npm test`.
+2. Create a Supabase project and apply the SQL migrations in `supabase/migrations/`.
+3. Set `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, and a long random `DASHBOARD_API_KEY`.
+4. Store the same dashboard key in the private Supabase credential table using the secure migration/setup process; never expose it to a browser.
+5. Run `npm install`, `npm run dev`, and `npm test`.
 
-The service refuses to start without required secrets. Never commit credentials.
+The service refuses to start without required configuration. Never commit credentials. Do not use a Supabase service-role or secret key in Render for this setup.
 
 ## API
 - `GET /health` — process health only.
