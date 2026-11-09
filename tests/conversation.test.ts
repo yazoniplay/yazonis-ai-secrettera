@@ -42,7 +42,7 @@ describe('receptionist conversation', () => {
     expect(turn.state.callerPhone).toBe('+46701234567');
     turn = advanceConversation(turn.state, 'Morgan');
     turn = advanceConversation(turn.state, 'I need to discuss my appointment');
-    expect(turn.reply).toContain('number you\'re calling from');
+    expect(turn.reply).toContain('call you back on this number');
     turn = advanceConversation(turn.state, 'Yes');
     expect(turn.completed).toBe(true);
     expect(turn.state.stage).toBe('complete');
