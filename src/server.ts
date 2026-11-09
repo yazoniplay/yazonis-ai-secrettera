@@ -185,7 +185,7 @@ app.post('/api/conversations/:id/messages', async (request, reply) => {
     callerPhone: row.caller_phone, intent: row.intent, message: row.message,
     callbackRequested: row.callback_requested
   };
-  const turn = advanceConversation(current, parsed.data.text);
+  const turn = advanceConversation(current, parsed.data.text, config.OWNER_NAME);
   const now = new Date().toISOString();
   const update = await supabase.from('receptionist_conversations').update({
     language: turn.state.language, stage: turn.state.stage,
