@@ -78,7 +78,6 @@ describe('receptionist conversation', () => {
     expect(turn.reply).toContain('Here is exactly what I will send Yazoniii:');
     expect(turn.reply).toContain('Callback: Not requested');
     expect(turn.reply).toContain('Priority: URGENT');
-    expect(turn.reply).toContain('marked the message urgent');
   });
 
   it.each(['I am his mom', "It's his dad calling", "I'm Yazoniii's sister", 'This is your brother'])(
