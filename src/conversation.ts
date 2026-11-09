@@ -150,7 +150,7 @@ export function advanceConversation(current: ConversationState, callerText: stri
     if (isNo(text)) {
       state.callbackRequested = false;
       state.stage = 'complete';
-      return { state, reply: copy.completed, completed: true };
+      return { state, reply: copy.completedMessage(ownerName, state.callerName, state.priority === 'urgent'), completed: true };
     }
     return { state, reply: copy.askYesNo, completed: false };
   }
