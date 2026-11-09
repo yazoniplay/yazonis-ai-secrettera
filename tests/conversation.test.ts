@@ -20,8 +20,10 @@ describe('receptionist conversation', () => {
     let turn = createConversation('en');
     turn = advanceConversation(turn.state, 'Sam');
     turn = advanceConversation(turn.state, 'Please ask them to call me');
+    expect(turn.reply).toContain('Yazoniii');
     turn = advanceConversation(turn.state, 'Yes');
     expect(turn.state.stage).toBe('phone');
+    expect(turn.reply).toContain('Yazoniii');
     turn = advanceConversation(turn.state, '123');
     expect(turn.state.stage).toBe('phone');
     expect(turn.reply).toContain('complete phone number');
@@ -29,6 +31,9 @@ describe('receptionist conversation', () => {
     expect(turn.completed).toBe(true);
     expect(turn.state.callerPhone).toBe('+46701234567');
     expect(turn.state.callbackRequested).toBe(true);
+    expect(turn.reply).toContain('Yazoniii');
+    expect(turn.reply).toContain('+46701234567');
+    expect(turn.reply).not.toContain('Sam');
   });
 
   it('switches to Swedish when the caller speaks Swedish', () => {
