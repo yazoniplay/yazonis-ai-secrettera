@@ -1,10 +1,10 @@
 # Nour Receptionist
 
-Cloud-first personal AI receptionist. The phone is an endpoint, not the runtime: call handling and availability decisions run on hosted infrastructure.
+Cloud-first personal AI receptionist. Call handling and availability decisions run on hosted infrastructure; your phone is only an endpoint.
 
-## Current milestone: availability API
+## Current milestone: availability API + private dashboard
 
-This milestone establishes the backend contract and availability rules. Telephony, AI voice, WhatsApp and the desktop dashboard are not enabled until provider credentials and setup are configured.
+The dashboard is served by the same backend at `/`. It supports secure code-based login, an HttpOnly session cookie, live availability, manual status controls and a 10-minute confirmation countdown.
 
 ### Availability rules
 - Time zone: `Europe/Stockholm` (automatically handles CET/CEST).
@@ -16,27 +16,26 @@ This milestone establishes the backend contract and availability rules. Telephon
 
 ## Stack
 - Node.js 22 + TypeScript + Fastify
-- Supabase Postgres for persistent state
-- Supabase publishable API key plus a private request credential, enforced by Row Level Security
-- Vitest for tests
-- Render for hosting
+- Supabase Postgres with Row Level Security
+- Private dashboard code exchanged for a signed, HttpOnly, Secure, SameSite=Strict session cookie
+- Vitest and Render
 
-## Setup
-1. Copy `.env.example` to `.env`.
-2. Create a Supabase project and apply the SQL migrations in `supabase/migrations/`.
-3. Set `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, and a long random `DASHBOARD_API_KEY`.
-4. Store the same dashboard key in the private Supabase credential table using the secure migration/setup process; never expose it to a browser.
-5. Run `npm install`, `npm run dev`, and `npm test`.
-
-The service refuses to start without required configuration. Never commit credentials. Do not use a Supabase service-role or secret key in Render for this setup.
+## Environment
+Set `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `DASHBOARD_API_KEY`, and a separate random `DASHBOARD_ACCESS_CODE` (at least 24 characters). Never expose either credential in browser code or commit them.
 
 ## API
-- `GET /health` — process health only.
-- `GET /api/status` — effective availability and rule explanation.
-- `PUT /api/status` — update manual status. Requires `Authorization: Bearer <DASHBOARD_API_KEY>`.
-- `POST /api/status/confirm` — confirm availability for another 10 minutes. Requires the same authorization.
+- `GET /health` — process health.
+- `GET /` — private dashboard application.
+- `POST /api/auth/login` — exchange dashboard access code for a 12-hour session cookie.
+- `GET /api/auth/session` and `POST /api/auth/logout`.
+- `GET /api/status` — effective availability.
+- `PUT /api/status` — update manual status; requires a valid dashboard session or backend bearer credential.
+- `POST /api/status/confirm` — renew the 10-minute confirmation; same authorization.
 
 Update body: `{ "status": "available" }`. Allowed values: `available`, `busy`, `unavailable`.
+
+## Not connected yet
+Telephony, AI voice, WhatsApp and call history are not active. The dashboard labels these integrations as disconnected rather than implying they work.
 
 ## Privacy
 This milestone does not record calls, audio or caller data. Before adding voice recording, transcription, WhatsApp or caller memory, implement clear disclosure, consent handling, retention limits and access controls.
