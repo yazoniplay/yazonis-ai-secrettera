@@ -17,7 +17,7 @@ const supabase = createClient(config.SUPABASE_URL, config.SUPABASE_PUBLISHABLE_K
 const statusBody = z.object({ status: z.enum(['available', 'busy', 'unavailable']) });
 const loginBody = z.object({ code: z.string().min(1).max(256) });
 const languageBody = z.object({ text: z.string().min(1).max(2000), fallback: z.enum(['en', 'sv', 'ar']).optional() });
-const conversationCreateBody = z.object({ language: z.enum(['en', 'sv', 'ar']).default('en') });
+const conversationCreateBody = z.object({ language: z.enum(['en', 'sv', 'ar']).default('en'), callerPhone: z.string().trim().max(40).nullable().optional() });
 const conversationMessageBody = z.object({ text: z.string().trim().min(1).max(2000) });
 const conversationIdParams = z.object({ id: z.string().uuid() });
 type ConversationRow = { id: string; language: SupportedLanguage; stage: ConversationStage; status: 'open' | 'completed'; caller_name: string | null; caller_phone: string | null; intent: string | null; message: string | null; callback_requested: boolean | null; started_at: string; updated_at: string; completed_at: string | null };
@@ -145,9 +145,9 @@ app.post('/api/conversations', async (request, reply) => {
   if (!hasSession(request)) return reply.code(401).send({ error: 'Unauthorized' });
   const parsed = conversationCreateBody.safeParse(request.body ?? {});
   if (!parsed.success) return reply.code(400).send({ error: 'Choose en, sv or ar.' });
-  const firstTurn = createConversation(parsed.data.language);
+  const suppliedCallerPhone = parsed.data.callerPhone?.trim() || null;\n  const firstTurn = createConversation(parsed.data.language, suppliedCallerPhone);
   const { data, error } = await supabase.from('receptionist_conversations').insert({
-    language: firstTurn.state.language, stage: firstTurn.state.stage, status: 'open'
+    language: firstTurn.state.language, stage: firstTurn.state.stage, status: 'open', caller_phone: firstTurn.state.callerPhone
   }).select('*').single();
   if (error || !data) {
     app.log.error({ error }, 'Could not create receptionist conversation');
