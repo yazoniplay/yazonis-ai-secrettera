@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { config } from './config.js';
 import { evaluateAvailability, type ManualStatus } from './availability.js';
 import { detectLanguage, getReceptionPhrases, type SupportedLanguage } from './language.js';
+import { advanceConversation, createConversation, type ConversationState, type ConversationStage } from './conversation.js';
 
 const app = Fastify({ logger: true });
 const supabase = createClient(config.SUPABASE_URL, config.SUPABASE_PUBLISHABLE_KEY, {
@@ -16,6 +17,10 @@ const supabase = createClient(config.SUPABASE_URL, config.SUPABASE_PUBLISHABLE_K
 const statusBody = z.object({ status: z.enum(['available', 'busy', 'unavailable']) });
 const loginBody = z.object({ code: z.string().min(1).max(256) });
 const languageBody = z.object({ text: z.string().min(1).max(2000), fallback: z.enum(['en', 'sv', 'ar']).optional() });
+const conversationCreateBody = z.object({ language: z.enum(['en', 'sv', 'ar']).default('en') });
+const conversationMessageBody = z.object({ text: z.string().trim().min(1).max(2000) });
+const conversationIdParams = z.object({ id: z.string().uuid() });
+type ConversationRow = { id: string; language: SupportedLanguage; stage: ConversationStage; status: 'open' | 'completed'; caller_name: string | null; caller_phone: string | null; intent: string | null; message: string | null; callback_requested: boolean | null; started_at: string; updated_at: string; completed_at: string | null };
 type SettingsRow = { manual_status: ManualStatus; last_confirmed_at: string | null; last_seen_at: string | null; updated_at: string };
 const SESSION_COOKIE = 'nour_session';
 const SESSION_TTL_SECONDS = 12 * 60 * 60;
@@ -133,6 +138,100 @@ app.post('/api/language/detect', async (request, reply) => {
   if (!parsed.success) return reply.code(400).send({ error: 'Provide text and an optional language fallback.' });
   const language: SupportedLanguage = detectLanguage(parsed.data.text, parsed.data.fallback ?? 'en');
   return { language, supportedLanguages: ['en', 'sv', 'ar'], responses: getReceptionPhrases(language) };
+});
+
+
+app.post('/api/conversations', async (request, reply) => {
+  if (!hasSession(request)) return reply.code(401).send({ error: 'Unauthorized' });
+  const parsed = conversationCreateBody.safeParse(request.body ?? {});
+  if (!parsed.success) return reply.code(400).send({ error: 'Choose en, sv or ar.' });
+  const firstTurn = createConversation(parsed.data.language);
+  const { data, error } = await supabase.from('receptionist_conversations').insert({
+    language: firstTurn.state.language, stage: firstTurn.state.stage, status: 'open'
+  }).select('*').single();
+  if (error || !data) {
+    app.log.error({ error }, 'Could not create receptionist conversation');
+    return reply.code(503).send({ error: 'Could not start a test conversation' });
+  }
+  const row = data as ConversationRow;
+  const saved = await supabase.from('receptionist_messages').insert({
+    conversation_id: row.id, role: 'assistant', content: firstTurn.reply, language: firstTurn.state.language
+  });
+  if (saved.error) {
+    app.log.error({ error: saved.error }, 'Could not save conversation greeting');
+    return reply.code(503).send({ error: 'Could not save conversation greeting' });
+  }
+  return { conversationId: row.id, language: firstTurn.state.language, stage: firstTurn.state.stage, reply: firstTurn.reply };
+});
+
+app.post('/api/conversations/:id/messages', async (request, reply) => {
+  if (!hasSession(request)) return reply.code(401).send({ error: 'Unauthorized' });
+  const params = conversationIdParams.safeParse(request.params);
+  const parsed = conversationMessageBody.safeParse(request.body);
+  if (!params.success || !parsed.success) return reply.code(400).send({ error: 'Provide a valid conversation ID and message.' });
+  const { data, error } = await supabase.from('receptionist_conversations').select('*').eq('id', params.data.id).single();
+  if (error || !data) return reply.code(404).send({ error: 'Conversation not found.' });
+  const row = data as ConversationRow;
+  if (row.status === 'completed') return reply.code(409).send({ error: 'This conversation is already complete.' });
+  const callerSaved = await supabase.from('receptionist_messages').insert({
+    conversation_id: row.id, role: 'caller', content: parsed.data.text, language: row.language
+  });
+  if (callerSaved.error) {
+    app.log.error({ error: callerSaved.error }, 'Could not save caller message');
+    return reply.code(503).send({ error: 'Could not save your message.' });
+  }
+  const current: ConversationState = {
+    language: row.language, stage: row.stage, callerName: row.caller_name,
+    callerPhone: row.caller_phone, intent: row.intent, message: row.message,
+    callbackRequested: row.callback_requested
+  };
+  const turn = advanceConversation(current, parsed.data.text);
+  const now = new Date().toISOString();
+  const update = await supabase.from('receptionist_conversations').update({
+    language: turn.state.language, stage: turn.state.stage,
+    status: turn.completed ? 'completed' : 'open',
+    caller_name: turn.state.callerName, caller_phone: turn.state.callerPhone,
+    intent: turn.state.intent, message: turn.state.message,
+    callback_requested: turn.state.callbackRequested, updated_at: now,
+    completed_at: turn.completed ? now : null
+  }).eq('id', row.id);
+  if (update.error) {
+    app.log.error({ error: update.error }, 'Could not update conversation state');
+    return reply.code(503).send({ error: 'Could not update conversation state.' });
+  }
+  const assistantSaved = await supabase.from('receptionist_messages').insert({
+    conversation_id: row.id, role: 'assistant', content: turn.reply, language: turn.state.language
+  });
+  if (assistantSaved.error) {
+    app.log.error({ error: assistantSaved.error }, 'Could not save receptionist response');
+    return reply.code(503).send({ error: 'Could not save receptionist response.' });
+  }
+  return { conversationId: row.id, language: turn.state.language, stage: turn.state.stage, completed: turn.completed, reply: turn.reply };
+});
+
+app.get('/api/conversations', async (request, reply) => {
+  if (!hasSession(request)) return reply.code(401).send({ error: 'Unauthorized' });
+  const { data, error } = await supabase.from('receptionist_conversations')
+    .select('id,language,status,caller_name,caller_phone,intent,message,callback_requested,started_at,completed_at')
+    .order('started_at', { ascending: false }).limit(30);
+  if (error) {
+    app.log.error({ error }, 'Could not list receptionist conversations');
+    return reply.code(503).send({ error: 'Could not load saved messages.' });
+  }
+  return { conversations: data ?? [] };
+});
+
+app.get('/api/conversations/:id', async (request, reply) => {
+  if (!hasSession(request)) return reply.code(401).send({ error: 'Unauthorized' });
+  const params = conversationIdParams.safeParse(request.params);
+  if (!params.success) return reply.code(400).send({ error: 'Invalid conversation ID.' });
+  const [conversation, messages] = await Promise.all([
+    supabase.from('receptionist_conversations').select('*').eq('id', params.data.id).single(),
+    supabase.from('receptionist_messages').select('id,role,content,language,created_at').eq('conversation_id', params.data.id).order('created_at', { ascending: true })
+  ]);
+  if (conversation.error || !conversation.data) return reply.code(404).send({ error: 'Conversation not found.' });
+  if (messages.error) return reply.code(503).send({ error: 'Could not load conversation messages.' });
+  return { conversation: conversation.data, messages: messages.data ?? [] };
 });
 
 app.setErrorHandler((error, _request, reply) => { app.log.error(error); return reply.code(500).send({ error: 'Internal server error' }); });
