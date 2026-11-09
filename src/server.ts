@@ -22,7 +22,7 @@ const conversationMessageBody = z.object({ text: z.string().trim().min(1).max(20
 const conversationIdParams = z.object({ id: z.string().uuid() });
 type ConversationRow = { id: string; language: SupportedLanguage; stage: ConversationStage; status: 'open' | 'completed'; caller_name: string | null; caller_phone: string | null; intent: string | null; message: string | null; callback_requested: boolean | null; started_at: string; updated_at: string; completed_at: string | null };
 type SettingsRow = { manual_status: ManualStatus; last_confirmed_at: string | null; last_seen_at: string | null; updated_at: string };
-const SESSION_COOKIE = 'nour_session';
+const SESSION_COOKIE = 'yazonis_secrettera_session';
 const SESSION_TTL_SECONDS = 12 * 60 * 60;
 let loginFailures = 0;
 let loginWindowStarted = Date.now();
@@ -55,7 +55,7 @@ function isAuthorized(request: { headers: { authorization?: string; cookie?: str
   return request.headers.authorization === `Bearer ${config.DASHBOARD_API_KEY}` || hasSession(request);
 }
 
-app.get('/health', async () => ({ ok: true, service: 'nour-receptionist' }));
+app.get('/health', async () => ({ ok: true, service: 'yazonis-secrettera' }));
 app.get('/', async (_request, reply) => {
   try {
     const html = await readFile(new URL('../public/dashboard.html', import.meta.url), 'utf8');
