@@ -12,9 +12,28 @@ button,input{font:inherit}button{cursor:pointer}.shell{max-width:1120px;margin:a
 .simulator{margin-top:16px}.simhead{display:flex;justify-content:space-between;align-items:center;gap:12px}.simcontrols{display:flex;gap:9px;align-items:center}.simcontrols select,.chatinput{background:#10130f;border:1px solid var(--line);border-radius:10px;padding:10px 12px;color:var(--text);font:inherit}.chatlog{display:grid;gap:10px;max-height:300px;overflow:auto;margin:18px 0;padding:14px;background:#11140f;border:1px solid var(--line);border-radius:13px;min-height:96px}.bubble{max-width:min(82%,560px);padding:10px 12px;border-radius:12px;font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere}.bubble.assistant{justify-self:start;background:#252b20;border:1px solid #38412b}.bubble.caller{justify-self:end;background:#c6d66a;color:#171a12}.chatform{display:flex;gap:9px}.chatinput{flex:1;min-width:0}.simnote{font-size:11px;color:var(--muted);margin:9px 0 0}.history{display:grid;gap:8px;margin-top:12px}.historyitem{display:flex;justify-content:space-between;gap:12px;padding:10px 12px;background:#11140f;border:1px solid var(--line);border-radius:10px;font-size:12px}.historyitem span{color:var(--muted)}.historyitem strong{font-weight:550}
 .integration{display:flex;justify-content:space-between;align-items:center;gap:12px}.integration p{margin:4px 0 0;color:var(--muted);font-size:12px}.integration strong{font-size:13px}.loginwrap{position:fixed;inset:0;background:#080a08dd;backdrop-filter:blur(12px);display:grid;place-items:center;padding:20px;z-index:5}.login{width:min(410px,100%);background:#191d17;border:1px solid var(--line);border-radius:20px;padding:28px;box-shadow:0 30px 90px #0008}.login h2{font-size:25px;letter-spacing:-.04em;margin:14px 0 5px}.login p{color:var(--muted);font-size:13px;margin:0 0 20px}.login input{width:100%;background:#10130f;border:1px solid var(--line);border-radius:10px;padding:12px;color:var(--text);outline:none}.login input:focus{border-color:var(--lime)}.login .action{width:100%;margin-top:10px}.loginerror{min-height:18px;color:var(--red);font-size:12px;margin-top:9px}.hidden{display:none!important}
 @media(max-width:760px){.shell{padding:22px 16px 40px}.top{margin-bottom:30px}.intro{align-items:start}.clock{font-size:11px}.grid{grid-template-columns:1fr}.side{grid-template-columns:1fr 1fr}.integrations{grid-template-columns:1fr}.panel{padding:19px}.mainpanel{min-height:0}}@media(max-width:420px){.side{grid-template-columns:1fr}.intro{display:block}.clock{text-align:left;margin-top:15px}.statusname{font-size:25px}}
+
+/* Time-aware animated sky */
+:root{--sky-top:#111a2d;--sky-mid:#354d68;--sky-low:#e2a77f;--sky-glow:#f5c18a;--sky-stars:0;--sky-sun:0;--sky-moon:0}
+body{background:transparent;isolation:isolate}
+.sky{position:fixed;inset:0;z-index:-2;overflow:hidden;pointer-events:none;background:linear-gradient(180deg,var(--sky-top) 0%,var(--sky-mid) 56%,var(--sky-low) 100%);transition:background 5s ease}
+.sky:after{content:"";position:absolute;inset:35% 0 0;background:linear-gradient(180deg,transparent, color-mix(in srgb,var(--sky-glow) 22%,transparent));opacity:.75;transition:background 5s ease}
+.sky-stars{position:absolute;inset:0;opacity:var(--sky-stars);transition:opacity 4s ease;background-image:radial-gradient(1.5px 1.5px at 8% 18%,#fff 98%,transparent),radial-gradient(1px 1px at 22% 42%,#fff 98%,transparent),radial-gradient(1.5px 1.5px at 37% 13%,#fff 98%,transparent),radial-gradient(1px 1px at 49% 29%,#fff 98%,transparent),radial-gradient(1.5px 1.5px at 64% 12%,#fff 98%,transparent),radial-gradient(1px 1px at 78% 35%,#fff 98%,transparent),radial-gradient(1.5px 1.5px at 91% 17%,#fff 98%,transparent),radial-gradient(1px 1px at 15% 68%,#fff 98%,transparent),radial-gradient(1px 1px at 83% 61%,#fff 98%,transparent)}
+.celestial{position:absolute;width:94px;height:94px;border-radius:50%;top:var(--celestial-y,16%);left:var(--celestial-x,72%);transform:translate(-50%,-50%);transition:top 5s ease,left 5s ease,opacity 4s ease,background 4s ease,box-shadow 4s ease;opacity:var(--sky-sun);background:#ffe3a0;box-shadow:0 0 42px 13px #ffd18b66,0 0 120px 50px #ffd18b33}
+.moon{position:absolute;width:68px;height:68px;top:var(--moon-y,22%);left:var(--moon-x,76%);transform:translate(-50%,-50%);border-radius:50%;opacity:var(--sky-moon);transition:top 5s ease,left 5s ease,opacity 4s ease;background:#f0f1dc;box-shadow:0 0 35px #e9edcf55}
+.moon:after{content:"";position:absolute;width:61px;height:61px;border-radius:50%;background:var(--sky-top);top:-8px;left:17px;transition:background 4s ease}
+.sky-cloud{position:absolute;width:190px;height:48px;border-radius:50px;background:#ffffff20;filter:blur(1px);opacity:.45;top:30%;left:-220px;animation:cloud-drift 75s linear infinite}
+.sky-cloud:before,.sky-cloud:after{content:"";position:absolute;background:inherit;border-radius:50%;bottom:12px}
+.sky-cloud:before{width:80px;height:80px;left:28px}.sky-cloud:after{width:58px;height:58px;left:88px;bottom:20px}
+.sky-cloud.two{top:48%;transform:scale(.7);animation-duration:105s;animation-delay:-48s;opacity:.25}
+@keyframes cloud-drift{from{translate:0 0}to{translate:calc(100vw + 440px) 0}}
+/* Keep dashboard surfaces readable while letting the sky show through */
+.panel{background:linear-gradient(145deg,#171d1bdc,#171a17d9);backdrop-filter:blur(15px);border-color:#ffffff20}
+.loginwrap{background:#080a08a8}
+@media(prefers-reduced-motion:reduce){.sky,.sky-stars,.celestial,.moon{transition:none}.sky-cloud{animation:none}}
 </style>
 </head>
-<body>
+<body>\n<div class="sky" id="sky" aria-hidden="true"><div class="sky-stars"></div><div class="celestial"></div><div class="moon"></div><div class="sky-cloud"></div><div class="sky-cloud two"></div></div>
 <div class="loginwrap" id="loginwrap"><form class="login" id="loginform"><div class="brand"><span class="mark">YS</span><span>YAZONIS <span style="color:var(--muted);font-weight:400">SECRETTERA</span></span></div><h2>Welcome back.</h2><p>Enter your private dashboard access code to manage your availability.</p><input id="accesscode" type="password" autocomplete="current-password" placeholder="Access code" required minlength="1"><button class="action primary" type="submit">Unlock dashboard</button><div class="loginerror" id="loginerror"></div></form></div>
 <main class="shell">
 <header class="top"><div class="brand"><span class="mark">YS</span><span>YAZONIS <span style="color:var(--muted);font-weight:400">SECRETTERA</span></span></div><div class="topright">YAZONIS SECRETTERA · CONTROL CENTRE</div></header>
@@ -41,7 +60,31 @@ button,input{font:inherit}button{cursor:pointer}.shell{max-width:1120px;margin:a
 <div class="footer"><span>YAZONIS SECRETTERA · PRIVATE DASHBOARD</span><span id="updated">Waiting for first sync</span></div>
 </main>
 <script>
-const $=s=>document.querySelector(s);let statusData=null,refreshing=false;
+const $=s=>document.querySelector(s);let statusData=null,refreshing=false;\n
+const skyPhases=[
+{start:0,end:5,top:'#07101f',mid:'#172b46',low:'#273d58',glow:'#263d5b',stars:1,sun:0,moon:1,label:'Night'},
+{start:5,end:7,top:'#283b59',mid:'#b06e70',low:'#f1b17e',glow:'#ffd09a',stars:.35,sun:.85,moon:0,label:'Sunrise'},
+{start:7,end:10,top:'#5c91b5',mid:'#a9c9d1',low:'#e8d2b0',glow:'#f7d9aa',stars:0,sun:1,moon:0,label:'Morning'},
+{start:10,end:16,top:'#4389bd',mid:'#83b9d4',low:'#c7dce0',glow:'#d6e8e8',stars:0,sun:1,moon:0,label:'Daylight'},
+{start:16,end:19,top:'#46658b',mid:'#c47e76',low:'#f0ad79',glow:'#ffc28b',stars:0,sun:1,moon:0,label:'Sunset'},
+{start:19,end:21,top:'#182943',mid:'#4a4e70',low:'#a36d70',glow:'#d18a78',stars:.45,sun:.15,moon:.65,label:'Dusk'},
+{start:21,end:24,top:'#07101f',mid:'#172b46',low:'#273d58',glow:'#263d5b',stars:1,sun:0,moon:1,label:'Night'}
+];
+function updateSky(){
+ const parts=new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Stockholm',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date()).split(':');
+ const hour=Number(parts[0])+Number(parts[1])/60;
+ const phase=skyPhases.find(p=>hour>=p.start&&hour<p.end)||skyPhases[0];
+ const root=document.documentElement;
+ root.style.setProperty('--sky-top',phase.top);root.style.setProperty('--sky-mid',phase.mid);root.style.setProperty('--sky-low',phase.low);root.style.setProperty('--sky-glow',phase.glow);
+ root.style.setProperty('--sky-stars',phase.stars);root.style.setProperty('--sky-sun',phase.sun);root.style.setProperty('--sky-moon',phase.moon);
+ const progress=(hour-phase.start)/(phase.end-phase.start);
+ const x=phase.label==='Sunrise'?18+progress*55:phase.label==='Sunset'?78-progress*55:phase.label==='Night'?76:50+Math.sin(progress*Math.PI)*25;
+ const y=phase.label==='Sunrise'?72-progress*48:phase.label==='Sunset'?24+progress*55:phase.label==='Night'?22:14;
+ root.style.setProperty('--celestial-x',x+'%');root.style.setProperty('--celestial-y',y+'%');
+ root.style.setProperty('--moon-x',(phase.label==='Night'?78:82)+'%');root.style.setProperty('--moon-y','22%');
+ document.querySelector('.sky').dataset.phase=phase.label;
+}
+
 async function heartbeat(){if(document.visibilityState!=='visible'||!navigator.onLine||!$('#loginwrap').classList.contains('hidden'))return;try{await api('/api/presence/heartbeat',{method:'POST',body:'{}'});$('#connection').textContent='Live · phone connected'}catch(e){$('#connection').textContent='Offline'}}
 const labels={available:'Available',busy:'Busy',unavailable:'Unavailable',after_hours:'After hours',confirmation_expired:'Confirmation expired',offline:'Offline · unavailable'};
 function localClock(){const d=new Date();$('#clock').textContent=new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Stockholm',hour:'2-digit',minute:'2-digit',second:'2-digit'}).format(d);$('#date').textContent=new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Stockholm',weekday:'long',day:'numeric',month:'long',year:'numeric'}).format(d)}
@@ -63,5 +106,5 @@ $('#startconversation').addEventListener('click',async()=>{try{const data=await 
 $('#chatform').addEventListener('submit',async e=>{e.preventDefault();const text=$('#chatinput').value.trim();if(!text||!activeConversationId)return;$('#chatinput').value='';$('#chatsend').disabled=true;try{const data=await api('/api/conversations/'+activeConversationId+'/messages',{method:'POST',body:JSON.stringify({text})});addBubble('caller',text);addBubble('assistant',data.reply);if(data.completed){$('#chatinput').disabled=true;$('#chatsend').disabled=true;await loadConversations()}else{$('#chatinput').focus()}}catch(err){$('#chatinput').value=text;showNotice(err.message)}finally{if(!$('#chatinput').disabled)$('#chatsend').disabled=false}});
 $('#refreshconversations').addEventListener('click',loadConversations);
 
-localClock();setInterval(localClock,1000);setInterval(tick,1000);setInterval(refresh,15000);setInterval(heartbeat,25000);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')heartbeat()});window.addEventListener('online',heartbeat);api('/api/auth/session').then(async()=>{$('#loginwrap').classList.add('hidden');await heartbeat();await refresh()}).catch(()=>$('#loginwrap').classList.remove('hidden'));
+updateSky();setInterval(updateSky,60000);localClock();setInterval(localClock,1000);setInterval(tick,1000);setInterval(refresh,15000);setInterval(heartbeat,25000);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')heartbeat()});window.addEventListener('online',heartbeat);api('/api/auth/session').then(async()=>{$('#loginwrap').classList.add('hidden');await heartbeat();await refresh()}).catch(()=>$('#loginwrap').classList.remove('hidden'));
 </script></body></html>
