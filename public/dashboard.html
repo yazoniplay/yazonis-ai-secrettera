@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#111310"><title>Nour — Reception</title>
+<meta name="theme-color" content="#111310"><title>Yazonis Secrettera</title>
 <style>
 :root{color-scheme:dark;--bg:#10120f;--panel:#191c17;--panel2:#20241d;--line:#30362a;--text:#eff0e8;--muted:#969d8c;--lime:#c6d66a;--red:#e58b83;--amber:#e7c77a}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 80% -20%,#303923 0,transparent 42%),var(--bg);color:var(--text);font:15px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif;min-height:100vh}
@@ -15,9 +15,9 @@ button,input{font:inherit}button{cursor:pointer}.shell{max-width:1120px;margin:a
 </style>
 </head>
 <body>
-<div class="loginwrap" id="loginwrap"><form class="login" id="loginform"><div class="brand"><span class="mark">ن</span><span>NOUR <span style="color:var(--muted);font-weight:400">/ RECEPTION</span></span></div><h2>Welcome back.</h2><p>Enter your private dashboard access code to manage your availability.</p><input id="accesscode" type="password" autocomplete="current-password" placeholder="Access code" required minlength="1"><button class="action primary" type="submit">Unlock dashboard</button><div class="loginerror" id="loginerror"></div></form></div>
+<div class="loginwrap" id="loginwrap"><form class="login" id="loginform"><div class="brand"><span class="mark">YS</span><span>YAZONIS <span style="color:var(--muted);font-weight:400">SECRETTERA</span></span></div><h2>Welcome back.</h2><p>Enter your private dashboard access code to manage your availability.</p><input id="accesscode" type="password" autocomplete="current-password" placeholder="Access code" required minlength="1"><button class="action primary" type="submit">Unlock dashboard</button><div class="loginerror" id="loginerror"></div></form></div>
 <main class="shell">
-<header class="top"><div class="brand"><span class="mark">ن</span><span>NOUR <span style="color:var(--muted);font-weight:400">/ RECEPTION</span></span></div><div class="topright">PERSONAL CONTROL CENTRE</div></header>
+<header class="top"><div class="brand"><span class="mark">YS</span><span>YAZONIS <span style="color:var(--muted);font-weight:400">SECRETTERA</span></span></div><div class="topright">YAZONIS SECRETTERA · CONTROL CENTRE</div></header>
 <section class="intro"><div><div class="eyebrow">Your call availability</div><h1>Good to have you back.</h1><p>One place to control how incoming calls are handled. Keep this dashboard open on your phone to stay online.</p></div><div class="clock"><span>SWEDEN · STOCKHOLM</span><strong id="clock">--:--:--</strong><span id="date">Loading local time…</span></div></section>
 <section class="grid">
 <div class="panel mainpanel"><div class="panelhead"><h2>Availability status</h2><div class="live"><i class="dot"></i><span id="connection">Connecting</span></div></div>
@@ -30,15 +30,15 @@ button,input{font:inherit}button{cursor:pointer}.shell{max-width:1120px;margin:a
 <div class="panel"><div class="panelhead"><h2>Calling rules</h2><span class="tag">AUTOMATIC</span></div><div class="rows"><div class="rowitem"><span>Timezone</span><strong>Stockholm</strong></div><div class="rowitem"><span>Daily cutoff</span><strong>18:00</strong></div><div class="rowitem"><span>Confirmation</span><strong>10 minutes</strong></div><div class="rowitem"><span>After-hours</span><strong>Unavailable</strong></div></div></div>
 </div></section>
 <section class="panel simulator">
-<div class="simhead"><div><h2>Test Nour's conversation</h2><div class="simnote">A text simulation of the receptionist flow. This does not place or receive a real phone call.</div></div>
+<div class="simhead"><div><h2>Test Yazonis Secrettera</h2><div class="simnote">A text simulation of the receptionist flow. This does not place or receive a real phone call.</div></div>
 <div class="simcontrols"><select id="simlanguage" aria-label="Conversation language"><option value="en">English</option><option value="sv">Svenska</option><option value="ar">العربية</option></select><button class="action primary" id="startconversation">Start test</button></div></div>
-<div class="chatlog" id="chatlog" aria-live="polite"><div class="sub">Start a test to see how Nour greets callers and records callback requests.</div></div>
+<div class="chatlog" id="chatlog" aria-live="polite"><div class="sub">Start a test to see how Yazonis Secrettera greets callers and records callback requests.</div></div>
 <form class="chatform" id="chatform"><input class="chatinput" id="chatinput" placeholder="Type what the caller would say…" maxlength="2000" autocomplete="off" disabled><button class="action primary" id="chatsend" type="submit" disabled>Send</button></form>
 <div class="panelhead" style="margin-top:22px"><h2>Saved conversations</h2><button class="action" id="refreshconversations">Refresh</button></div>
 <div class="history" id="conversationhistory"><div class="sub">No conversations loaded yet.</div></div>
 </section>
 <section class="integrations"><div class="panel integration"><div><strong>Phone system</strong><p>Call answering and transfer are not connected yet.</p></div><span class="tag off">NOT CONNECTED</span></div><div class="panel integration"><div><strong>WhatsApp</strong><p>Business messaging integration is not connected yet.</p></div><span class="tag off">NOT CONNECTED</span></div></section>
-<div class="footer"><span>NOUR RECEPTION · PRIVATE DASHBOARD</span><span id="updated">Waiting for first sync</span></div>
+<div class="footer"><span>YAZONIS SECRETTERA · PRIVATE DASHBOARD</span><span id="updated">Waiting for first sync</span></div>
 </main>
 <script>
 const $=s=>document.querySelector(s);let statusData=null,refreshing=false;
