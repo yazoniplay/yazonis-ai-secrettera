@@ -20,7 +20,7 @@ const languageBody = z.object({ text: z.string().min(1).max(2000), fallback: z.e
 const conversationCreateBody = z.object({ language: z.enum(['en', 'sv', 'ar']).default('en'), callerPhone: z.string().trim().max(40).nullable().optional() });
 const conversationMessageBody = z.object({ text: z.string().trim().min(1).max(2000) });
 const conversationIdParams = z.object({ id: z.string().uuid() });
-type ConversationRow = { id: string; language: SupportedLanguage; stage: ConversationStage; status: 'open' | 'completed'; caller_name: string | null; caller_phone: string | null; intent: string | null; message: string | null; callback_requested: boolean | null; started_at: string; updated_at: string; completed_at: string | null };
+type ConversationRow = { id: string; priority: 'normal' | 'urgent'; language: SupportedLanguage; stage: ConversationStage; status: 'open' | 'completed'; caller_name: string | null; caller_phone: string | null; intent: string | null; message: string | null; callback_requested: boolean | null; started_at: string; updated_at: string; completed_at: string | null };
 type SettingsRow = { manual_status: ManualStatus; last_confirmed_at: string | null; last_seen_at: string | null; updated_at: string };
 const SESSION_COOKIE = 'yazonis_secrettera_session';
 const SESSION_TTL_SECONDS = 12 * 60 * 60;
@@ -148,7 +148,7 @@ app.post('/api/conversations', async (request, reply) => {
   const suppliedCallerPhone = parsed.data.callerPhone?.trim() || null;
   const firstTurn = createConversation(parsed.data.language, suppliedCallerPhone);
   const { data, error } = await supabase.from('receptionist_conversations').insert({
-    language: firstTurn.state.language, stage: firstTurn.state.stage, status: 'open', caller_phone: firstTurn.state.callerPhone
+    language: firstTurn.state.language, stage: firstTurn.state.stage, status: 'open', priority: firstTurn.state.priority, caller_phone: firstTurn.state.callerPhone
   }).select('*').single();
   if (error || !data) {
     app.log.error({ error }, 'Could not create receptionist conversation');
@@ -182,7 +182,7 @@ app.post('/api/conversations/:id/messages', async (request, reply) => {
     return reply.code(503).send({ error: 'Could not save your message.' });
   }
   const current: ConversationState = {
-    language: row.language, stage: row.stage, callerName: row.caller_name,
+    priority: row.priority ?? 'normal', language: row.language, stage: row.stage, callerName: row.caller_name,
     callerPhone: row.caller_phone, intent: row.intent, message: row.message,
     callbackRequested: row.callback_requested
   };
@@ -193,7 +193,7 @@ app.post('/api/conversations/:id/messages', async (request, reply) => {
     status: turn.completed ? 'completed' : 'open',
     caller_name: turn.state.callerName, caller_phone: turn.state.callerPhone,
     intent: turn.state.intent, message: turn.state.message,
-    callback_requested: turn.state.callbackRequested, updated_at: now,
+    callback_requested: turn.state.callbackRequested, priority: turn.state.priority, updated_at: now,
     completed_at: turn.completed ? now : null
   }).eq('id', row.id);
   if (update.error) {
@@ -207,13 +207,13 @@ app.post('/api/conversations/:id/messages', async (request, reply) => {
     app.log.error({ error: assistantSaved.error }, 'Could not save receptionist response');
     return reply.code(503).send({ error: 'Could not save receptionist response.' });
   }
-  return { conversationId: row.id, language: turn.state.language, stage: turn.state.stage, completed: turn.completed, reply: turn.reply };
+  return { conversationId: row.id, language: turn.state.language, stage: turn.state.stage, priority: turn.state.priority, completed: turn.completed, reply: turn.reply };
 });
 
 app.get('/api/conversations', async (request, reply) => {
   if (!hasSession(request)) return reply.code(401).send({ error: 'Unauthorized' });
   const { data, error } = await supabase.from('receptionist_conversations')
-    .select('id,language,status,caller_name,caller_phone,intent,message,callback_requested,started_at,completed_at')
+    .select('id,language,status,priority,caller_name,caller_phone,intent,message,callback_requested,started_at,completed_at')
     .order('started_at', { ascending: false }).limit(30);
   if (error) {
     app.log.error({ error }, 'Could not list receptionist conversations');
