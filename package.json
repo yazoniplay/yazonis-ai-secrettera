@@ -1,9 +1,9 @@
 {
-  "name": "nour-receptionist",
+  "name": "yazonis-secrettera",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Cloud-first personal AI receptionist",
+  "description": "Yazonis Secrettera — cloud-first AI receptionist",
   "engines": { "node": ">=22" },
   "scripts": {
     "dev": "tsx watch src/server.ts",
