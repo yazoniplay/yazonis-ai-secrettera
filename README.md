@@ -25,7 +25,7 @@ The dashboard is served by the same backend at `/`. It supports secure code-base
 - Vitest and Render
 
 ## Environment
-Set `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `DASHBOARD_API_KEY`, and a separate random `DASHBOARD_ACCESS_CODE` (at least 24 characters). Never expose either credential in browser code or commit them.
+Set `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `DASHBOARD_API_KEY`, and a separate random `DASHBOARD_ACCESS_CODE` (at least 24 characters). For natural AI conversations, set `OPENROUTER_API_KEY` as a server-side secret and optionally override `OPENROUTER_MODEL` (default: `google/gemini-2.5-flash-lite`). The API key is only read by the backend; never put it in browser code, GitHub, or a committed environment file. If the key is absent or the provider fails, the receptionist uses its deterministic fallback.
 
 ## API
 - `GET /health` — process health.
