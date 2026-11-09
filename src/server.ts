@@ -145,7 +145,8 @@ app.post('/api/conversations', async (request, reply) => {
   if (!hasSession(request)) return reply.code(401).send({ error: 'Unauthorized' });
   const parsed = conversationCreateBody.safeParse(request.body ?? {});
   if (!parsed.success) return reply.code(400).send({ error: 'Choose en, sv or ar.' });
-  const suppliedCallerPhone = parsed.data.callerPhone?.trim() || null;\n  const firstTurn = createConversation(parsed.data.language, suppliedCallerPhone);
+  const suppliedCallerPhone = parsed.data.callerPhone?.trim() || null;
+  const firstTurn = createConversation(parsed.data.language, suppliedCallerPhone);
   const { data, error } = await supabase.from('receptionist_conversations').insert({
     language: firstTurn.state.language, stage: firstTurn.state.stage, status: 'open', caller_phone: firstTurn.state.callerPhone
   }).select('*').single();
