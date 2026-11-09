@@ -75,8 +75,30 @@ describe('receptionist conversation', () => {
     expect(turn.reply).toContain('flag this as urgent');
     turn = advanceConversation(turn.state, 'No');
     expect(turn.completed).toBe(true);
-    expect(turn.reply).toContain('your name and the reason for your call');
+    expect(turn.reply).toContain('Here is exactly what I will send Yazoniii:');
+    expect(turn.reply).toContain('Callback: Not requested');
+    expect(turn.reply).toContain('Priority: URGENT');
     expect(turn.reply).toContain('marked the message urgent');
+  });
+
+  it.each(['I am his mom', "It's his dad calling", "I'm Yazoniii's sister", 'This is your brother'])(
+    'flags a caller identifying as close family: %s',
+    identity => {
+      const turn = advanceConversation(createConversation('en').state, identity);
+      expect(turn.state.priority).toBe('urgent');
+      expect(turn.state.callerName).toBe('Yazoniii family member');
+    }
+  );
+
+  it('reads back the exact recorded details before ending', () => {
+    let turn = createConversation('en');
+    turn = advanceConversation(turn.state, 'Alex');
+    turn = advanceConversation(turn.state, 'Please call me about the appointment tomorrow.');
+    turn = advanceConversation(turn.state, 'No');
+    expect(turn.reply).toContain('Caller: Alex');
+    expect(turn.reply).toContain('Message: Please call me about the appointment tomorrow.');
+    expect(turn.reply).toContain('Callback: Not requested');
+    expect(turn.reply).toContain('Priority: Normal');
   });
 
   it('marks explicit emergencies as urgent', () => {
