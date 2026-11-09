@@ -6,8 +6,13 @@ import { config } from './config.js';
 import { evaluateAvailability, type ManualStatus } from './availability.js';
 
 const app = Fastify({ logger: true });
-const supabase = createClient(config.SUPABASE_URL, config.SUPABASE_SERVICE_ROLE_KEY, {
-  auth: { persistSession: false, autoRefreshToken: false }
+const supabase = createClient(config.SUPABASE_URL, config.SUPABASE_PUBLISHABLE_KEY, {
+  auth: { persistSession: false, autoRefreshToken: false },
+  global: {
+    headers: {
+      'x-dashboard-key': config.DASHBOARD_API_KEY
+    }
+  }
 });
 
 const statusBody = z.object({
