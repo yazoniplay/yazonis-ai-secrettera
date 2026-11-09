@@ -1,6 +1,6 @@
-# Nour Receptionist
+# Yazonis Secrettera
 
-Cloud-first personal AI receptionist. Call handling and availability decisions run on hosted infrastructure; your phone is only an endpoint.
+Yazonis Secrettera is a cloud-first AI receptionist. Call handling and availability decisions run on hosted infrastructure; your phone is only an endpoint.
 
 ## Current milestone: availability API + private dashboard
 
