@@ -34,7 +34,7 @@ const prompts: Record<SupportedLanguage, Copy> = {
     askYesNo: 'Would you like a callback? Please say yes or no.',
     askPhoneAgain: 'I didn’t catch a complete number. Could you repeat it, including the country code?',
     callbackConfirmation: (owner, phone, name, urgent) => `Thanks${name ? `, ${name}` : ''}. I’ll pass ${owner} your name, the reason for your call, and your callback number (${phone}).${urgent ? ' I’ve marked the message urgent.' : ''} Goodbye.`,
-    completedMessage: (owner, name, urgent, message, phone, callback) => `Thanks${name ? `, ${name}` : ''}. Here is exactly what I will send ${owner}: Caller: ${name || 'Name not provided'}. Phone: ${phone || 'Not provided'}. Message: ${message || 'No reason recorded'}. Callback: ${callback === true ? 'Requested' : callback === false ? 'Not requested' : 'Not confirmed'}. Priority: ${urgent ? 'URGENT' : 'Normal'}. Goodbye.`
+    completedMessage: (owner, name, urgent, message, phone, callback) => `Thanks${name ? `, ${name}` : ''}. Here is exactly what I will send ${owner}: Caller: ${name || 'Name not provided'}. Phone: ${phone || 'Not provided'}. Message: ${message || 'No reason recorded'} | Callback: ${callback === true ? 'Requested' : callback === false ? 'Not requested' : 'Not confirmed'}. Priority: ${urgent ? 'URGENT' : 'Normal'}. Goodbye.`
   },
   sv: {
     greeting: 'Hej och tack för att du ringer Yazonis Secrettera. Jag kan ta ett meddelande och se till att Yazoniii får informationen.',
@@ -45,7 +45,7 @@ const prompts: Record<SupportedLanguage, Copy> = {
     askYesNo: 'Vill du bli uppringd? Svara gärna ja eller nej.',
     askPhoneAgain: 'Jag uppfattade inte ett fullständigt nummer. Kan du säga det igen, inklusive landskod?',
     callbackConfirmation: (owner, phone, name, urgent) => `Tack${name ? `, ${name}` : ''}. Jag skickar ditt namn, anledningen till samtalet och numret ${phone} till ${owner}.${urgent ? ' Jag har markerat meddelandet som brådskande.' : ''} Hej då.`,
-    completedMessage: (owner, name, urgent, message, phone, callback) => `Tack${name ? `, ${name}` : ''}. Här är exakt vad jag skickar till ${owner}: Namn: ${name || 'Inte angivet'}. Telefonnummer: ${phone || 'Inte angivet'}. Meddelande: ${message || 'Ingen anledning angiven'}. Återuppringning: ${callback === true ? 'Önskas' : callback === false ? 'Önskas inte' : 'Inte bekräftad'}. Prioritet: ${urgent ? 'BRÅDSKANDE' : 'Normal'}. Hej då.`
+    completedMessage: (owner, name, urgent, message, phone, callback) => `Tack${name ? `, ${name}` : ''}. Här är exakt vad jag skickar till ${owner}: Namn: ${name || 'Inte angivet'}. Telefonnummer: ${phone || 'Inte angivet'}. Meddelande: ${message || 'Ingen anledning angiven'} | Återuppringning: ${callback === true ? 'Önskas' : callback === false ? 'Önskas inte' : 'Inte bekräftad'}. Prioritet: ${urgent ? 'BRÅDSKANDE' : 'Normal'}. Hej då.`
   },
   ar: {
     greeting: 'مرحباً، شكراً لاتصالك بـ Yazonis Secrettera. يمكنني تسجيل رسالتك والتأكد من وصول التفاصيل إلى Yazoniii.',
@@ -56,7 +56,7 @@ const prompts: Record<SupportedLanguage, Copy> = {
     askYesNo: 'هل ترغب في معاودة الاتصال؟ يرجى الإجابة بنعم أو لا.',
     askPhoneAgain: 'لم أتمكن من التقاط رقم كامل. هل يمكنك تكراره مع رمز الدولة؟',
     callbackConfirmation: (owner, phone, name, urgent) => `شكراً${name ? ` يا ${name}` : ''}. سأرسل إلى ${owner} اسمك وسبب اتصالك ورقم معاودة الاتصال ${phone}.${urgent ? ' وقد وضعت علامة عاجل على الرسالة.' : ''} إلى اللقاء.`,
-    completedMessage: (owner, name, urgent, message, phone, callback) => `شكراً${name ? ` يا ${name}` : ''}. هذه هي التفاصيل التي سأرسلها إلى ${owner}: الاسم: ${name || 'غير مذكور'}. الهاتف: ${phone || 'غير متوفر'}. الرسالة: ${message || 'لم يُذكر السبب'}. معاودة الاتصال: ${callback === true ? 'مطلوبة' : callback === false ? 'غير مطلوبة' : 'غير مؤكدة'}. الأولوية: ${urgent ? 'عاجل' : 'عادي'}. إلى اللقاء.`
+    completedMessage: (owner, name, urgent, message, phone, callback) => `شكراً${name ? ` يا ${name}` : ''}. هذه هي التفاصيل التي سأرسلها إلى ${owner}: الاسم: ${name || 'غير مذكور'}. الهاتف: ${phone || 'غير متوفر'}. الرسالة: ${message || 'لم يُذكر السبب'} | معاودة الاتصال: ${callback === true ? 'مطلوبة' : callback === false ? 'غير مطلوبة' : 'غير مؤكدة'}. الأولوية: ${urgent ? 'عاجل' : 'عادي'}. إلى اللقاء.`
   }
 };
 
