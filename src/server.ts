@@ -256,7 +256,7 @@ app.post('/api/conversations/:id/messages', async (request, reply) => {
     priority,
     language: detectLanguage(parsed.data.text, current.language),
     stage: aiResult.completed ? 'complete' : 'reason',
-    callerName: aiResult.callerName ?? (urgentFamilyIdentity ? current.callerName ?? 'Yazoniii family member' : current.callerName),
+    callerName: urgentFamilyIdentity ? current.callerName ?? 'Yazoniii family member' : aiResult.callerName ?? current.callerName,
     callerPhone: aiResult.callerPhone ?? current.callerPhone,
     intent: aiResult.intent ?? current.intent,
     message: aiResult.message ?? current.message,
