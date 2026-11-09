@@ -29,7 +29,7 @@ const prompts: Record<SupportedLanguage, {
   completed: string;
 }> = {
   en: {
-    greeting: 'Hello, you have reached Nour, the virtual receptionist. I can take a message and arrange a callback.',
+    greeting: 'Hello, you have reached Yazonis Secrettera, the virtual receptionist. I can take a message and arrange a callback.',
     askName: 'May I have your name, please?',
     askReason: (name) => `Thank you${name ? `, ${name}` : ''}. How can I help you today?`,
     askCallback: 'Would you like someone to call you back? Please answer yes or no.',
@@ -39,7 +39,7 @@ const prompts: Record<SupportedLanguage, {
     completed: 'Thank you. I have saved your message and callback details. Goodbye.'
   },
   sv: {
-    greeting: 'Hej och välkommen till Nour, den virtuella receptionisten. Jag kan ta ett meddelande och ordna att du blir uppringd.',
+    greeting: 'Hej och välkommen till Yazonis Secrettera, den virtuella receptionisten. Jag kan ta ett meddelande och ordna att du blir uppringd.',
     askName: 'Vad heter du?',
     askReason: (name) => `Tack${name ? `, ${name}` : ''}. Vad kan jag hjälpa dig med?`,
     askCallback: 'Vill du att någon ringer tillbaka? Svara gärna ja eller nej.',
@@ -49,7 +49,7 @@ const prompts: Record<SupportedLanguage, {
     completed: 'Tack. Jag har sparat ditt meddelande och dina kontaktuppgifter. Hej då.'
   },
   ar: {
-    greeting: 'مرحباً، لقد وصلت إلى نور، موظف الاستقبال الافتراضي. يمكنني تسجيل رسالة وترتيب معاودة الاتصال بك.',
+    greeting: 'مرحباً، لقد وصلت إلى Yazonis Secrettera، موظف الاستقبال الافتراضي. يمكنني تسجيل رسالة وترتيب معاودة الاتصال بك.',
     askName: 'ما اسمك من فضلك؟',
     askReason: (name) => `شكراً لك${name ? ` يا ${name}` : ''}. كيف يمكنني مساعدتك اليوم؟`,
     askCallback: 'هل ترغب في أن يتصل بك أحد؟ يرجى الإجابة بنعم أو لا.',
