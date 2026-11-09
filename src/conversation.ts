@@ -136,7 +136,7 @@ export function advanceConversation(current: ConversationState, callerText: stri
     if (!validPhone(text)) return { state, reply: copy.askPhoneAgain, completed: false };
     state.callerPhone = text.slice(0, 40);
     state.stage = 'complete';
-    return { state, reply: copy.callbackConfirmation(ownerName, state.callerPhone, state.callerName, state.priority === 'urgent'), completed: true };
+    return { state, reply: copy.completedMessage(ownerName, state.callerName, state.priority === 'urgent', state.message, state.callerPhone, state.callbackRequested), completed: true };
   }
-  return { state, reply: copy.completedMessage(ownerName, state.callerName, state.priority === 'urgent'), completed: true };
+  return { state, reply: copy.completedMessage(ownerName, state.callerName, state.priority === 'urgent', state.message, state.callerPhone, state.callbackRequested), completed: true };
 }
