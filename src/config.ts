@@ -9,8 +9,8 @@ const schema = z.object({
   DASHBOARD_API_KEY: z.string().min(24),
   DASHBOARD_ACCESS_CODE: z.string().min(24),
   OWNER_NAME: z.string().trim().min(1).max(80).default('Yazoniii'),
-  GEMINI_API_KEY: z.string().optional().default(''),
-  GEMINI_MODEL: z.string().trim().min(1).default('gemini-2.5-flash-lite'),
+  OPENROUTER_API_KEY: z.string().optional().default(''),
+  OPENROUTER_MODEL: z.string().trim().min(1).default('google/gemini-2.5-flash-lite'),
   CORS_ORIGIN: z.string().default('http://localhost:3001')
 });
 
