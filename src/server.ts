@@ -165,6 +165,63 @@ app.post('/api/conversations', async (request, reply) => {
   return { conversationId: row.id, language: firstTurn.state.language, stage: firstTurn.state.stage, reply: firstTurn.reply };
 });
 
+type AIConversationResult = {
+  reply: string; callerName: string | null; callerPhone: string | null;
+  intent: string | null; message: string | null; callbackRequested: boolean | null;
+  priority: 'normal' | 'urgent'; completed: boolean;
+};
+
+async function generateReceptionistReply(
+  transcript: Array<{ role: string; content: string }>,
+  current: ConversationState
+): Promise<AIConversationResult | null> {
+  if (!config.GEMINI_API_KEY) return null;
+  const system = [
+    'You are Yazonis Secrettera, a calm, capable personal receptionist for ' + config.OWNER_NAME + '.',
+    'Speak naturally, like a thoughtful human receptionist. Understand interruptions, fragments, corrections, multiple details in one sentence and unexpected but relevant replies. Ask one useful follow-up question at a time. Never invent facts, names, numbers, availability or promises.',
+    'Collect caller identity/name, reason for calling, callback number if requested and no caller ID exists, callback preference, and urgency.',
+    'A caller identifying themselves as the owner’s mother, father, sister, brother, parent or close family is URGENT even without saying emergency. Explicit emergencies and urgent/immediate requests are also URGENT. A casual third-person mention of family is not enough.',
+    'When enough details are collected, finish with a read-back beginning: Here is exactly what I will send ' + config.OWNER_NAME + ': Then list caller identity/name, phone or not provided, the reason/message, callback request and priority. The read-back must exactly match the structured fields. Unknown details must be labelled unknown.',
+    'Never claim the message has already been sent, seen, or that the owner will definitely call.',
+    'Return ONLY valid JSON with keys reply, callerName, callerPhone, intent, message, callbackRequested, priority, completed. Use null for unknown values; priority normal or urgent; completed boolean. Keep message concise and faithful.',
+    'Current known state: ' + JSON.stringify(current),
+    'Conversation transcript: ' + JSON.stringify(transcript)
+  ].join('\n');
+  const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(config.GEMINI_MODEL) + ':generateContent?key=' + encodeURIComponent(config.GEMINI_API_KEY), {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: system }] },
+      contents: [{ role: 'user', parts: [{ text: 'Continue the receptionist conversation using the transcript and return the required JSON.' }] }],
+      generationConfig: { responseMimeType: 'application/json', temperature: 0.35, maxOutputTokens: 700 }
+    }),
+    signal: AbortSignal.timeout(18000)
+  });
+  if (!response.ok) {
+    app.log.warn({ status: response.status }, 'Gemini unavailable; using deterministic receptionist fallback');
+    return null;
+  }
+  const payload = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
+  const raw = payload.candidates?.[0]?.content?.parts?.map(part => part.text ?? '').join('').trim();
+  if (!raw) return null;
+  try {
+    const value = JSON.parse(raw) as Partial<AIConversationResult>;
+    if (typeof value.reply !== 'string' || typeof value.completed !== 'boolean') return null;
+    return {
+      reply: value.reply.slice(0, 2500),
+      callerName: typeof value.callerName === 'string' ? value.callerName.slice(0, 100) : null,
+      callerPhone: typeof value.callerPhone === 'string' ? value.callerPhone.slice(0, 40) : null,
+      intent: typeof value.intent === 'string' ? value.intent.slice(0, 80) : null,
+      message: typeof value.message === 'string' ? value.message.slice(0, 2000) : null,
+      callbackRequested: typeof value.callbackRequested === 'boolean' ? value.callbackRequested : null,
+      priority: value.priority === 'urgent' ? 'urgent' : 'normal',
+      completed: value.completed
+    };
+  } catch {
+    app.log.warn('Gemini returned invalid JSON; using deterministic receptionist fallback');
+    return null;
+  }
+}
+
 app.post('/api/conversations/:id/messages', async (request, reply) => {
   if (!hasSession(request)) return reply.code(401).send({ error: 'Unauthorized' });
   const params = conversationIdParams.safeParse(request.params);
@@ -186,7 +243,30 @@ app.post('/api/conversations/:id/messages', async (request, reply) => {
     callerPhone: row.caller_phone, intent: row.intent, message: row.message,
     callbackRequested: row.callback_requested
   };
-  const turn = advanceConversation(current, parsed.data.text, config.OWNER_NAME);
+  const transcriptResult = await supabase.from('receptionist_messages')
+    .select('role,content').eq('conversation_id', row.id).order('created_at', { ascending: true });
+  const aiResult = transcriptResult.error ? null : await generateReceptionistReply(
+    (transcriptResult.data ?? []).map(message => ({ role: message.role, content: message.content })),
+    current
+  ).catch(error => { app.log.warn({ error }, 'Gemini request failed; using deterministic fallback'); return null; });
+  const deterministicTurn = advanceConversation(current, parsed.data.text, config.OWNER_NAME);
+  const urgentFamilyIdentity = /\b(i am|i'm|this is|it's|it is|calling|jag är|det är|ringer som)\b.{0,45}\b(mom|mum|mother|dad|father|sister|brother|parent|mamma|morsa|pappa|syster|bror|förälder)\b|\b(your|his|her|hans|hennes)\s+(mom|mum|mother|dad|father|sister|brother|mamma|pappa|syster|bror)\b|أنا (أمك|أبوك|والدتك|والدك|أختك|أخوك)/iu.test(parsed.data.text);
+  const priority = aiResult?.priority === 'urgent' || urgentFamilyIdentity || deterministicTurn.state.priority === 'urgent' ? 'urgent' : 'normal';
+  const nextState: ConversationState = aiResult ? {
+    priority,
+    language: detectLanguage(parsed.data.text, current.language),
+    stage: aiResult.completed ? 'complete' : 'reason',
+    callerName: aiResult.callerName ?? (urgentFamilyIdentity ? current.callerName ?? 'Yazoniii family member' : current.callerName),
+    callerPhone: aiResult.callerPhone ?? current.callerPhone,
+    intent: aiResult.intent ?? current.intent,
+    message: aiResult.message ?? current.message,
+    callbackRequested: aiResult.callbackRequested ?? current.callbackRequested
+  } : { ...deterministicTurn.state, priority };
+  const turn = {
+    state: nextState,
+    completed: aiResult?.completed ?? deterministicTurn.completed,
+    reply: aiResult?.reply ?? deterministicTurn.reply
+  };
   const now = new Date().toISOString();
   const update = await supabase.from('receptionist_conversations').update({
     language: turn.state.language, stage: turn.state.stage,
