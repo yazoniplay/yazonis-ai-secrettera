@@ -175,35 +175,53 @@ async function generateReceptionistReply(
   transcript: Array<{ role: string; content: string }>,
   current: ConversationState
 ): Promise<AIConversationResult | null> {
-  if (!config.GEMINI_API_KEY) return null;
+  if (!config.OPENROUTER_API_KEY) return null;
   const system = [
     'You are Yazonis Secrettera, a calm, capable personal receptionist for ' + config.OWNER_NAME + '.',
-    'Speak naturally, like a thoughtful human receptionist. Understand interruptions, fragments, corrections, multiple details in one sentence and unexpected but relevant replies. Ask one useful follow-up question at a time. Never invent facts, names, numbers, availability or promises.',
-    'Collect caller identity/name, reason for calling, callback number if requested and no caller ID exists, callback preference, and urgency.',
-    'A caller identifying themselves as the owner’s mother, father, sister, brother, parent or close family is URGENT even without saying emergency. Explicit emergencies and urgent/immediate requests are also URGENT. A casual third-person mention of family is not enough.',
-    'When enough details are collected, finish with a read-back beginning: Here is exactly what I will send ' + config.OWNER_NAME + ': Then list caller identity/name, phone or not provided, the reason/message, callback request and priority. The read-back must exactly match the structured fields. Unknown details must be labelled unknown.',
-    'Never claim the message has already been sent, seen, or that the owner will definitely call.',
-    'Return ONLY valid JSON with keys reply, callerName, callerPhone, intent, message, callbackRequested, priority, completed. Use null for unknown values; priority normal or urgent; completed boolean. Keep message concise and faithful.',
+    'Speak naturally, warmly and concisely, like a skilled human receptionist. Do not sound like a form or repeat a rigid script.',
+    'Understand interruptions, fragments, corrections, multiple details in one sentence, changes of mind, and unexpected but relevant replies. Use the entire transcript and current state. Do not ask for information already provided. Ask only one useful follow-up question at a time.',
+    'Collect and preserve the caller identity/name, caller phone (if supplied), reason/message, callback preference, and callback number if requested and no caller ID exists.',
+    'URGENT POLICY: A caller identifying themselves as the owner’s mother, father, sister, brother, parent or close family member is URGENT even without saying emergency. Explicit emergencies and urgent/immediate requests are also URGENT. A casual third-person mention of family is not enough. Never downgrade an already urgent conversation.',
+    'When enough details are collected, finish with a read-back that tells the caller exactly what will be sent to ' + config.OWNER_NAME + '. Include caller identity/name, phone (or Not provided), exact message/reason, callback preference, and priority. The read-back must match the structured fields. Never claim it has already been delivered or seen.',
+    'If the caller is a family member, preserve their relationship as callerName, such as "Mother" or "Sister", unless they also give their personal name; then include both.',
+    'Reply in the caller’s language: English, Swedish or Arabic. Keep the conversation in the language the caller is using unless they switch.',
+    'Return ONLY valid JSON with keys reply, callerName, callerPhone, intent, message, callbackRequested, priority, completed. Use null for unknown values; priority must be normal or urgent; completed must be boolean. Do not wrap JSON in markdown.',
     'Current known state: ' + JSON.stringify(current),
     'Conversation transcript: ' + JSON.stringify(transcript)
   ].join('\n');
-  const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(config.GEMINI_MODEL) + ':generateContent?key=' + encodeURIComponent(config.GEMINI_API_KEY), {
-    method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: system }] },
-      contents: [{ role: 'user', parts: [{ text: 'Continue the receptionist conversation using the transcript and return the required JSON.' }] }],
-      generationConfig: { responseMimeType: 'application/json', temperature: 0.35, maxOutputTokens: 700 }
-    }),
-    signal: AbortSignal.timeout(18000)
-  });
-  if (!response.ok) {
-    app.log.warn({ status: response.status }, 'Gemini unavailable; using deterministic receptionist fallback');
-    return null;
-  }
-  const payload = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
-  const raw = payload.candidates?.[0]?.content?.parts?.map(part => part.text ?? '').join('').trim();
-  if (!raw) return null;
   try {
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer ' + config.OPENROUTER_API_KEY,
+        'content-type': 'application/json',
+        'HTTP-Referer': 'https://yazonis-secrettera.onrender.com',
+        'X-OpenRouter-Title': 'Yazonis Secrettera'
+      },
+      body: JSON.stringify({
+        model: config.OPENROUTER_MODEL,
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: 'Continue the receptionist conversation using the transcript and return the required JSON.' }
+        ],
+        temperature: 0.35,
+        max_tokens: 850
+      }),
+      signal: AbortSignal.timeout(18000)
+    });
+    if (!response.ok) {
+      app.log.warn({ status: response.status }, 'OpenRouter unavailable; using deterministic receptionist fallback');
+      return null;
+    }
+    const payload = await response.json() as {
+      choices?: Array<{ message?: { content?: string | Array<{ type?: string; text?: string }> } }>
+    };
+    const content = payload.choices?.[0]?.message?.content;
+    const raw = (typeof content === 'string'
+      ? content
+      : Array.isArray(content) ? content.map(part => part.text ?? '').join('') : '').trim()
+      .replace(/^\`\`\`(?:json)?\s*/i, '').replace(/\s*\`\`\`$/u, '');
+    if (!raw) return null;
     const value = JSON.parse(raw) as Partial<AIConversationResult>;
     if (typeof value.reply !== 'string' || typeof value.completed !== 'boolean') return null;
     return {
@@ -216,8 +234,8 @@ async function generateReceptionistReply(
       priority: value.priority === 'urgent' ? 'urgent' : 'normal',
       completed: value.completed
     };
-  } catch {
-    app.log.warn('Gemini returned invalid JSON; using deterministic receptionist fallback');
+  } catch (error) {
+    app.log.warn({ error }, 'OpenRouter request failed or returned invalid JSON; using deterministic receptionist fallback');
     return null;
   }
 }
@@ -248,7 +266,7 @@ app.post('/api/conversations/:id/messages', async (request, reply) => {
   const aiResult = transcriptResult.error ? null : await generateReceptionistReply(
     (transcriptResult.data ?? []).map(message => ({ role: message.role, content: message.content })),
     current
-  ).catch(error => { app.log.warn({ error }, 'Gemini request failed; using deterministic fallback'); return null; });
+  ).catch(error => { app.log.warn({ error }, 'OpenRouter request failed; using deterministic fallback'); return null; });
   const deterministicTurn = advanceConversation(current, parsed.data.text, config.OWNER_NAME);
   const urgentFamilyIdentity = /\b(i am|i'm|this is|it's|it is|calling|jag är|det är|ringer som)\b.{0,45}\b(mom|mum|mother|dad|father|sister|brother|parent|mamma|morsa|pappa|syster|bror|förälder)\b|\b(your|his|her|hans|hennes)\s+(mom|mum|mother|dad|father|sister|brother|mamma|pappa|syster|bror)\b|أنا (أمك|أبوك|والدتك|والدك|أختك|أخوك)/iu.test(parsed.data.text);
   const priority = aiResult?.priority === 'urgent' || urgentFamilyIdentity || deterministicTurn.state.priority === 'urgent' ? 'urgent' : 'normal';
