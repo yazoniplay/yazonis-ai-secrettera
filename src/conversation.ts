@@ -1,6 +1,6 @@
 import { detectLanguage, type SupportedLanguage } from './language.js';
 
-export type ConversationStage = 'name' | 'reason' | 'callback' | 'phone' | 'complete';
+export type ConversationStage = 'name' | 'reason' | 'callback' | 'phone' | 'anything_else' | 'complete';
 export interface ConversationState {
   priority: 'normal' | 'urgent';
   language: SupportedLanguage;
@@ -20,6 +20,8 @@ type Copy = {
   askCallback: (owner: string, hasCallerId: boolean, urgent: boolean) => string;
   askPhone: (owner: string) => string;
   askYesNo: string;
+  askAnythingElse: string;
+  askAdditionalDetails: string;
   askPhoneAgain: string;
   callbackConfirmation: (owner: string, phone: string, name: string | null, urgent: boolean) => string;
   completedMessage: (owner: string, name: string | null, urgent: boolean, message: string | null, phone: string | null, callback: boolean | null) => string;
@@ -32,6 +34,8 @@ const prompts: Record<SupportedLanguage, Copy> = {
     askCallback: (owner, hasCallerId, urgent) => `${urgent ? 'I’ll flag this as urgent. ' : ''}I’ll pass ${owner} your name and the reason for your call. ${hasCallerId ? `Would you like ${owner} to call you back on this number?` : `Would you like ${owner} to call you back?`}`,
     askPhone: owner => `What number should ${owner} call you back on?`,
     askYesNo: 'Would you like a callback? Please say yes or no.',
+    askAnythingElse: 'Would you like to add anything else?',
+    askAdditionalDetails: 'Of course. What else would you like me to pass along?',
     askPhoneAgain: 'I didn’t catch a complete number. Could you repeat it, including the country code?',
     callbackConfirmation: (owner, phone, name, urgent) => `Thanks${name ? `, ${name}` : ''}. I’ll pass ${owner} your name, the reason for your call, and your callback number (${phone}).${urgent ? ' I’ve marked the message urgent.' : ''} Goodbye.`,
     completedMessage: (owner, name, urgent, message, phone, callback) => `Thanks${name ? `, ${name}` : ''}. Here is exactly what I will send ${owner}: Caller: ${name || 'Name not provided'}. Phone: ${phone || 'Not provided'}. Message: ${message || 'No reason recorded'} | Callback: ${callback === true ? 'Requested' : callback === false ? 'Not requested' : 'Not confirmed'}. Priority: ${urgent ? 'URGENT' : 'Normal'}. Goodbye.`
@@ -43,6 +47,8 @@ const prompts: Record<SupportedLanguage, Copy> = {
     askCallback: (owner, hasCallerId, urgent) => `${urgent ? 'Jag markerar detta som brådskande. ' : ''}Jag skickar ditt namn och anledningen till samtalet till ${owner}. ${hasCallerId ? `Vill du att ${owner} ringer tillbaka till numret du ringer från?` : `Vill du att ${owner} ringer tillbaka?`}`,
     askPhone: owner => `Vilket nummer ska ${owner} ringa tillbaka till?`,
     askYesNo: 'Vill du bli uppringd? Svara gärna ja eller nej.',
+    askAnythingElse: 'Vill du lägga till något mer?',
+    askAdditionalDetails: 'Självklart. Vad mer vill du att jag ska framföra?',
     askPhoneAgain: 'Jag uppfattade inte ett fullständigt nummer. Kan du säga det igen, inklusive landskod?',
     callbackConfirmation: (owner, phone, name, urgent) => `Tack${name ? `, ${name}` : ''}. Jag skickar ditt namn, anledningen till samtalet och numret ${phone} till ${owner}.${urgent ? ' Jag har markerat meddelandet som brådskande.' : ''} Hej då.`,
     completedMessage: (owner, name, urgent, message, phone, callback) => `Tack${name ? `, ${name}` : ''}. Här är exakt vad jag skickar till ${owner}: Namn: ${name || 'Inte angivet'}. Telefonnummer: ${phone || 'Inte angivet'}. Meddelande: ${message || 'Ingen anledning angiven'} | Återuppringning: ${callback === true ? 'Önskas' : callback === false ? 'Önskas inte' : 'Inte bekräftad'}. Prioritet: ${urgent ? 'BRÅDSKANDE' : 'Normal'}. Hej då.`
@@ -54,6 +60,8 @@ const prompts: Record<SupportedLanguage, Copy> = {
     askCallback: (owner, hasCallerId, urgent) => `${urgent ? 'سأضع علامة عاجل على رسالتك. ' : ''}سأرسل إلى ${owner} اسمك وسبب اتصالك. ${hasCallerId ? `هل تريد أن يتصل بك ${owner} على هذا الرقم؟` : `هل تريد أن يتصل بك ${owner}؟`}`,
     askPhone: owner => `ما الرقم الذي تريد من ${owner} الاتصال بك عليه؟`,
     askYesNo: 'هل ترغب في معاودة الاتصال؟ يرجى الإجابة بنعم أو لا.',
+    askAnythingElse: 'هل ترغب في إضافة أي شيء آخر؟',
+    askAdditionalDetails: 'بالتأكيد. ما الأمر الآخر الذي تريد مني إيصاله؟',
     askPhoneAgain: 'لم أتمكن من التقاط رقم كامل. هل يمكنك تكراره مع رمز الدولة؟',
     callbackConfirmation: (owner, phone, name, urgent) => `شكراً${name ? ` يا ${name}` : ''}. سأرسل إلى ${owner} اسمك وسبب اتصالك ورقم معاودة الاتصال ${phone}.${urgent ? ' وقد وضعت علامة عاجل على الرسالة.' : ''} إلى اللقاء.`,
     completedMessage: (owner, name, urgent, message, phone, callback) => `شكراً${name ? ` يا ${name}` : ''}. هذه هي التفاصيل التي سأرسلها إلى ${owner}: الاسم: ${name || 'غير مذكور'}. الهاتف: ${phone || 'غير متوفر'}. الرسالة: ${message || 'لم يُذكر السبب'} | معاودة الاتصال: ${callback === true ? 'مطلوبة' : callback === false ? 'غير مطلوبة' : 'غير مؤكدة'}. الأولوية: ${urgent ? 'عاجل' : 'عادي'}. إلى اللقاء.`
@@ -101,6 +109,18 @@ export function advanceConversation(current: ConversationState, callerText: stri
   const state: ConversationState = { ...current, language };
   if (!text) return { state, reply: copy.askReason(state.callerName), completed: false };
   if (state.stage === 'complete') return { state, reply: copy.completedMessage(ownerName, state.callerName, state.priority === 'urgent', state.message, state.callerPhone, state.callbackRequested), completed: true };
+  if (state.stage === 'anything_else') {
+    if (isNo(text)) {
+      state.stage = 'complete';
+      return { state, reply: copy.completedMessage(ownerName, state.callerName, state.priority === 'urgent', state.message, state.callerPhone, state.callbackRequested), completed: true };
+    }
+    if (isYes(text)) {
+      state.stage = 'reason';
+      return { state, reply: copy.askAdditionalDetails, completed: false };
+    }
+    state.message = [state.message, `Additional detail: ${text}`].filter(Boolean).join(' | ');
+    return { state, reply: copy.askAnythingElse, completed: false };
+  }
   if (state.stage === 'name') {
     const familyIdentity = /\b(i am|i'm|this is|it's|it is|calling|jag är|det är|ringer som)\b.{0,45}\b(mom|mum|mother|dad|father|sister|brother|parent|mamma|morsa|pappa|syster|bror|förälder)\b|\b(your|his|her|hans|hennes)\s+(mom|mum|mother|dad|father|sister|brother|mamma|pappa|syster|bror)\b|أنا (أمك|أبوك|والدتك|والدك|أختك|أخوك)/iu.test(text);
     state.callerName = familyIdentity ? 'Yazoniii family member' : cleanName(text) || null;
