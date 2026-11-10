@@ -234,7 +234,7 @@ export function advanceConversation(current: ConversationState, callerText: stri
     }
     state.message = applyCallerCorrection(state.message, text);
     state.intent = classifyIntent(state.message);
-    if (state.intent === 'appointment' && /\\b(problem|issue|something went wrong|went wrong|not right)\\b/iu.test(state.message || '') && !hasSpecificAppointmentProblem(state.message || '')) {
+    if (state.intent === 'appointment' && /\b(problem|issue|something went wrong|went wrong|not right)\b/iu.test(state.message || '') && !hasSpecificAppointmentProblem(state.message || '')) {
       return { state, reply: language === 'sv'
         ? 'Vad gick konkret fel med bokningen — avbokades den, ändrades tiden eller hände något annat?'
         : language === 'ar'
