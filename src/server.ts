@@ -328,11 +328,7 @@ app.post('/api/conversations/:id/messages', async (request, reply) => {
     ? 'complete'
     : callbackNeedsNumber
       ? 'phone'
-      : modelAskedForMore
-        ? 'anything_else'
-        : current.stage === 'anything_else'
-          ? 'anything_else'
-          : 'reason';
+      : deterministicTurn.state.stage;
   const nextState: ConversationState = {
     priority,
     language: detectLanguage(callerText, current.language),
@@ -342,7 +338,7 @@ app.post('/api/conversations/:id/messages', async (request, reply) => {
       : aiResult?.callerName ?? deterministicTurn.state.callerName ?? current.callerName,
     callerPhone,
     intent: aiResult?.intent ?? deterministicTurn.state.intent ?? current.intent,
-    message: aiResult?.message ?? mergeMessage(current.message, deterministicTurn.state.message),
+    message: deterministicTurn.state.message ?? aiResult?.message ?? mergeMessage(current.message, null),
     callbackRequested
   };
   const finalSummary = buildCompletionReply(nextState, config.OWNER_NAME);
@@ -351,23 +347,11 @@ app.post('/api/conversations/:id/messages', async (request, reply) => {
     sv: { ask: 'Vill du lägga till något mer?', goodbye: /\b(hej då|hejdå)\b[.!…]*/giu },
     ar: { ask: 'هل ترغب في إضافة أي شيء آخر؟', goodbye: /إلى اللقاء[.!…]*/gu }
   }[nextState.language];
-  let responseText = aiResult?.reply ?? deterministicTurn.reply;
-  const modelAsksForPhoneTooEarly = callbackRequested !== true
-    && /\b(phone number|telephone number|what number|which number|number should|provide your number|share your number|telefonnummer|vilket nummer|ما الرقم)\b/iu.test(responseText);
+  // The deterministic state machine owns stage transitions and required questions.
+  // The model may enrich structured understanding, but it must not loop or contradict the next stage.
+  let responseText = deterministicTurn.reply;
   if (callerDeclinedExtra) {
     responseText = finalSummary;
-  } else if (modelAsksForPhoneTooEarly) {
-    responseText = deterministicTurn.reply;
-  } else if (callbackNeedsNumber && aiResult) {
-    const asksNumber = /\b(number|phone|telephone|nummer|telefon|رقم|الهاتف)\b/iu.test(aiResult.reply);
-    if (!asksNumber) responseText = nextState.language === 'sv'
-      ? 'Vilket nummer ska jag be Yazoniii ringa tillbaka till?'
-      : nextState.language === 'ar'
-        ? 'ما الرقم الذي تريد من Yazoniii الاتصال بك عليه؟'
-        : 'What number should Yazoniii call you back on?';
-  } else if (modelAskedForMore) {
-    const cleaned = responseText.replace(languageCopy.goodbye, '').trim();
-    if (!cleaned.toLowerCase().includes(languageCopy.ask.toLowerCase())) responseText = cleaned + ' ' + languageCopy.ask;
   }
   const turn = {
     state: nextState,
