@@ -263,7 +263,7 @@ export function advanceConversation(current: ConversationState, callerText: stri
     }
     state.message = applyCallerCorrection(state.message, text);
     state.intent = classifyIntent(state.message);
-    const dateCorrection = text.match(/\\b(?:actually[, ]+)?(?:sorry[, ]+)?i meant\\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday|today|tomorrow|yesterday)\\s*,?\\s+not\\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday|today|tomorrow|yesterday)\\b/iu);
+    const dateCorrection = text.match(/\b(?:actually[, ]+)?(?:sorry[, ]+)?i meant\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday|today|tomorrow|yesterday)\s*,?\s+not\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday|today|tomorrow|yesterday)\b/iu);
     if (dateCorrection) {
       return { state, reply: `Got it — ${dateCorrection[2]} has been corrected to ${dateCorrection[1]}. ${copy.askCallback(ownerName, Boolean(state.callerPhone), state.priority === 'urgent')}`, completed: false };
     }
