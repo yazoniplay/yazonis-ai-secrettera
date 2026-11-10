@@ -36,7 +36,7 @@ const prompts: Record<SupportedLanguage, Copy> = {
     askYesNo: 'Would you like a callback?',
     askAnythingElse: 'Would you like to add anything else?',
     askAdditionalDetails: 'Of course. What else would you like me to pass along?',
-    askPhoneAgain: 'I didn’t catch a complete number. Could you repeat it, including the country code?',
+    askPhoneAgain: 'I couldn’t find a phone number in that message. Please enter at least 7 digits; a country code is optional.',
     callbackConfirmation: (owner, phone, name, urgent) => `Thanks${name ? `, ${name}` : ''}. I’ll pass ${owner} your name, the reason for your call, and your callback number (${phone}).${urgent ? ' I’ve marked the message urgent.' : ''}`,
     completedMessage: (owner, name, urgent, message, phone, callback) => `Thanks${name ? `, ${name}` : ''}. Here is exactly what I will send ${owner}: Caller: ${name || 'Name not provided'}. Phone: ${phone || 'Not provided'}. Message: ${message || 'No reason recorded'} | Callback: ${callback === true ? 'Requested' : callback === false ? 'Not requested' : 'Not confirmed'}. Priority: ${urgent ? 'URGENT' : 'Normal'}. Goodbye.`
   },
@@ -49,7 +49,7 @@ const prompts: Record<SupportedLanguage, Copy> = {
     askYesNo: 'Vill du bli uppringd?',
     askAnythingElse: 'Vill du lägga till något mer?',
     askAdditionalDetails: 'Självklart. Vad mer vill du att jag ska framföra?',
-    askPhoneAgain: 'Jag uppfattade inte ett fullständigt nummer. Kan du säga det igen, inklusive landskod?',
+    askPhoneAgain: 'Jag hittade inget telefonnummer i meddelandet. Ange minst 7 siffror; landskod är valfritt.',
     callbackConfirmation: (owner, phone, name, urgent) => `Tack${name ? `, ${name}` : ''}. Jag skickar ditt namn, anledningen till samtalet och numret ${phone} till ${owner}.${urgent ? ' Jag har markerat meddelandet som brådskande.' : ''}`,
     completedMessage: (owner, name, urgent, message, phone, callback) => `Tack${name ? `, ${name}` : ''}. Här är exakt vad jag skickar till ${owner}: Namn: ${name || 'Inte angivet'}. Telefonnummer: ${phone || 'Inte angivet'}. Meddelande: ${message || 'Ingen anledning angiven'} | Återuppringning: ${callback === true ? 'Önskas' : callback === false ? 'Önskas inte' : 'Inte bekräftad'}. Prioritet: ${urgent ? 'BRÅDSKANDE' : 'Normal'}. Hej då.`
   },
@@ -62,7 +62,7 @@ const prompts: Record<SupportedLanguage, Copy> = {
     askYesNo: 'هل ترغب في معاودة الاتصال؟',
     askAnythingElse: 'هل ترغب في إضافة أي شيء آخر؟',
     askAdditionalDetails: 'بالتأكيد. ما الأمر الآخر الذي تريد مني إيصاله؟',
-    askPhoneAgain: 'لم أتمكن من التقاط رقم كامل. هل يمكنك تكراره مع رمز الدولة؟',
+    askPhoneAgain: 'لم أتمكن من العثور على رقم هاتف في الرسالة. أدخل 7 أرقام على الأقل؛ رمز الدولة اختياري.',
     callbackConfirmation: (owner, phone, name, urgent) => `شكراً${name ? ` يا ${name}` : ''}. سأرسل إلى ${owner} اسمك وسبب اتصالك ورقم معاودة الاتصال ${phone}.${urgent ? ' وقد وضعت علامة عاجل على الرسالة.' : ''}`,
     completedMessage: (owner, name, urgent, message, phone, callback) => `شكراً${name ? ` يا ${name}` : ''}. هذه هي التفاصيل التي سأرسلها إلى ${owner}: الاسم: ${name || 'غير مذكور'}. الهاتف: ${phone || 'غير متوفر'}. الرسالة: ${message || 'لم يُذكر السبب'} | معاودة الاتصال: ${callback === true ? 'مطلوبة' : callback === false ? 'غير مطلوبة' : 'غير مؤكدة'}. الأولوية: ${urgent ? 'عاجل' : 'عادي'}. إلى اللقاء.`
   }
@@ -78,20 +78,23 @@ export function createConversation(language: SupportedLanguage = 'en', callerPho
   return { state, reply: `${copy.greeting} ${copy.askName}`, completed: false };
 }
 function cleanName(value: string): string {
-  return value.trim().replace(/^(my name is|i am|i'm|this is|it's|it is|jag heter|mitt namn är|jag är|اسمي|أنا)\s+/iu, '').replace(/[.!?،،]+$/u, '').slice(0, 100);
+  return value.trim().replace(/^(?:hi|hello|hey)[,!\\s]+/iu, '')
+    .replace(/^(my name is|i am|i'm|this is|it's|it is|jag heter|mitt namn är|jag är|اسمي|أنا)\\s+/iu, '')
+    .replace(/[.!?،،]+$/u, '').slice(0, 100);
 }
 function extractName(value: string): { name: string | null; remainder: string } {
+  const normalized = value.trim().replace(/^(?:hi|hello|hey)[,!\\s]+/iu, '');
   const patterns = [
     /^(?:my name is|this is|i am|i'm|it's|it is)\s+([A-Z][\p{L}'-]{1,35})(?:\s*[,.!?]\s*|\s+)([\s\S]*)$/iu,
     /^(?:jag heter|mitt namn är)\s+([\p{L}'-]{2,35})(?:\s*[,.!?]\s*|\s+)([\s\S]*)$/iu,
     /^(?:اسمي)\s+([\p{L}]{2,35})\s*([\s\S]*)$/u
   ];
   for (const pattern of patterns) {
-    const match = value.trim().match(pattern);
+    const match = normalized.match(pattern);
     if (match) return { name: match[1], remainder: (match[2] || '').trim() };
   }
-  if (/^(?:my name is|this is|i am|i'm|it's|jag heter|mitt namn är|اسمي)\s+[\p{L}'-]{2,35}[.!?]?$/iu.test(value.trim())) {
-    return { name: cleanName(value), remainder: '' };
+  if (/^(?:my name is|this is|i am|i'm|it's|it is|jag heter|mitt namn är|اسمي)\\s+[\\p{L}'-]{2,35}[.!?]?$/iu.test(normalized)) {
+    return { name: cleanName(normalized), remainder: '' };
   }
   return { name: null, remainder: '' };
 }
@@ -118,8 +121,18 @@ export function isNoResponse(value: string): boolean {
   return /^(?:no|nope|nah|not really|that's all|that is all|that's everything|that is everything|that's it|that is it|no that's all|no that is all|no that's everything|no that is everything|no that's it|no that is it|nothing else|no thanks|all good|i'm good|im good|nej|nä|nej tack|det var allt|inget mer|det räcker|لا|كلا|ليس هناك شيء آخر|هذا كل شيء)$/iu.test(normalized);
 }
 function validPhone(value: string): boolean {
-  const digits = value.replace(/\D/gu, '');
-  return digits.length >= 7 && digits.length <= 15 && /^[+\d(][\d\s().+-]*$/u.test(value.trim());
+  const digits = value.replace(/\\D/gu, '');
+  return digits.length >= 7 && digits.length <= 15 && /^[+\\d(][\\d\\s().+-]*$/u.test(value.trim());
+}
+
+function extractPhone(value: string): string | null {
+  // Extract a number from natural replies such as "My number is 070 123 45 67".
+  const candidates = value.match(/\\+?\\d(?:[\\d\\s().-]*\\d)?/gu) ?? [];
+  for (const candidate of candidates) {
+    const normalized = candidate.trim().replace(/[\\s().-]/gu, '');
+    if (validPhone(normalized)) return normalized;
+  }
+  return null;
 }
 function appendMessage(existing: string | null, next: string): string {
   if (!existing) return next;
@@ -242,11 +255,9 @@ export function advanceConversation(current: ConversationState, callerText: stri
   }
 
   if (state.stage === 'phone') {
-    if (!validPhone(text)) {
-      state.message = appendMessage(state.message, text);
-      return { state, reply: copy.askPhoneAgain, completed: false };
-    }
-    state.callerPhone = text.slice(0, 40);
+    const phone = extractPhone(text);
+    if (!phone) return { state, reply: copy.askPhoneAgain, completed: false };
+    state.callerPhone = phone.slice(0, 40);
     state.stage = 'anything_else';
     return { state, reply: copy.askAnythingElse, completed: false };
   }
