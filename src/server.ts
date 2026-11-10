@@ -175,79 +175,97 @@ async function generateReceptionistReply(
   transcript: Array<{ role: string; content: string }>,
   current: ConversationState
 ): Promise<AIConversationResult | null> {
-  if (!config.OPENROUTER_API_KEY) return null;
+  if (!config.OPENROUTER_API_KEY) {
+    app.log.warn('OPENROUTER_API_KEY is missing; conversational AI is disabled');
+    return null;
+  }
   const system = [
-    'You are Yazonis Secrettera, a calm, capable personal receptionist for ' + config.OWNER_NAME + '.',
-    'Speak naturally, warmly and concisely, like a skilled human receptionist. Do not sound like a form or repeat a rigid script.',
-    'Understand interruptions, fragments, corrections, multiple details in one sentence, changes of mind, and unexpected but relevant replies. Use the entire transcript and current state. Do not ask for information already provided. Ask only one useful follow-up question at a time.',
-    'Collect and preserve the caller identity/name, caller phone (if supplied), reason/message, callback preference, and callback number if requested and no caller ID exists.',
-    'URGENT POLICY: A caller identifying themselves as the owner’s mother, father, sister, brother, parent or close family member is URGENT even without saying emergency. Explicit emergencies and urgent/immediate requests are also URGENT. A casual third-person mention of family is not enough. Never downgrade an already urgent conversation.',
-    'Have a real, fluid conversation rather than conducting a rigid intake form. Respond to what the caller actually says, acknowledge relevant context briefly, handle side questions and corrections, and ask one natural follow-up only when it is useful. Do not force the caller through fixed stages or repeat questions.',
-    'Keep track of all useful details across the full transcript. If the caller gives several details at once, capture them together. If they add or correct something later, update the summary instead of ignoring it.',
-    'When you have enough information, give a concise read-back of what will be passed to ' + config.OWNER_NAME + ' (caller identity/name, phone or Not provided, exact reason/message, callback preference, priority), then ask: “Would you like to add anything else?” Do NOT say goodbye and do NOT mark the conversation completed yet.',
-    'Only finish after the caller clearly says no, that is all, or an equivalent. If they say yes, ask what else they would like to add. If they provide another detail, incorporate it and ask again whether they would like to add anything else. Never end the conversation immediately after receiving the original message.',
-    'If the caller is a family member, preserve their relationship as callerName, such as "Mother" or "Sister", unless they also give their personal name; then include both.',
-    'Reply in the caller’s language: English, Swedish or Arabic. Keep the conversation in the language the caller is using unless they switch.',
-    'Return ONLY valid JSON with keys reply, callerName, callerPhone, intent, message, callbackRequested, priority, completed. Use null for unknown values; priority must be normal or urgent; completed must be boolean. Do not wrap JSON in markdown.',
-    'Current known state: ' + JSON.stringify(current),
-    'Conversation transcript: ' + JSON.stringify(transcript)
+    'You are Yazonis Secrettera, a capable human-style receptionist for ' + config.OWNER_NAME + '.',
+    'Your job is to have a genuine conversation, not to run a questionnaire. Respond to the caller’s latest message in context. Be natural, concise, attentive and specific. Never repeat a question if the caller already answered it.',
+    'Use the entire conversation history. A caller may give information out of order, correct earlier information, answer multiple questions at once, change their mind, or add details while you are asking something else. Understand the meaning rather than demanding yes/no answers.',
+    'Ask at most ONE question in a reply, and only ask for information that is genuinely missing. If the caller gives a correction, acknowledge it and replace the old detail. If they give a callback time, retain it as part of the message. If they ask for a callback, record it; only ask for a phone number if no caller ID or number has been provided.',
+    'Capture caller name/identity, phone or caller ID, the actual message/reason, callback preference and any preferred callback time. Keep the message faithful to the caller; do not invent facts. Keep all earlier details unless corrected.',
+    'When enough details have been collected, read back a concise summary containing caller, phone (or Not provided), message, callback preference and priority. Then ask exactly one natural equivalent of “Would you like to add anything else?” Do not say goodbye yet.',
+    'Only complete after the caller clearly says they have nothing else to add AFTER that final question. If they add anything, incorporate it and ask whether there is anything else again. A request for a callback is not consent to end the conversation.',
+    'URGENT POLICY: identifying as the owner’s mother, father, sister, brother, parent or close family member is URGENT. Explicit emergencies and urgent/immediate requests are URGENT. A casual third-person mention is not enough. Never downgrade urgent priority.',
+    'For a family caller, callerName should preserve their relationship (for example “Mother” or “Sister”); include their personal name too if provided.',
+    'Reply in the language the caller is using: English, Swedish or Arabic. Preserve the language unless they switch.',
+    'Return ONLY a JSON object with exactly these keys: reply, callerName, callerPhone, intent, message, callbackRequested, priority, completed. Use null for unknown fields. callbackRequested must be true, false or null. priority must be "normal" or "urgent". completed must be true or false. Do not use markdown.',
+    'Current structured state: ' + JSON.stringify(current)
   ].join('\n');
   try {
+    const messages = [
+      { role: 'system' as const, content: system },
+      ...transcript.map(item => ({
+        role: (item.role === 'assistant' ? 'assistant' : 'user') as 'assistant' | 'user',
+        content: item.content
+      }))
+    ];
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
         authorization: 'Bearer ' + config.OPENROUTER_API_KEY,
         'content-type': 'application/json',
-        'HTTP-Referer': 'https://yazonis-secrettera.onrender.com',
+        'HTTP-Referer': 'https://yazonis-secreterra.onrender.com',
         'X-OpenRouter-Title': 'Yazonis Secrettera'
       },
       body: JSON.stringify({
         model: config.OPENROUTER_MODEL,
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user', content: 'Continue the receptionist conversation using the transcript and return the required JSON.' }
-        ],
-        temperature: 0.7,
-        max_tokens: 850
+        messages,
+        response_format: { type: 'json_object' },
+        temperature: 0.65,
+        max_tokens: 1100
       }),
-      signal: AbortSignal.timeout(18000)
+      signal: AbortSignal.timeout(25000)
     });
     if (!response.ok) {
       const errorBody = await response.text().catch(() => '');
-      app.log.warn({
+      app.log.error({
         status: response.status,
         model: config.OPENROUTER_MODEL,
-        providerError: errorBody.slice(0, 1200),
-        rateLimitLimit: response.headers.get('x-ratelimit-limit'),
-        rateLimitRemaining: response.headers.get('x-ratelimit-remaining'),
-        rateLimitReset: response.headers.get('x-ratelimit-reset'),
+        providerError: errorBody.slice(0, 1600),
         retryAfter: response.headers.get('retry-after')
-      }, 'OpenRouter request rejected; using deterministic receptionist fallback');
+      }, 'Conversational AI provider rejected the request');
       return null;
     }
     const payload = await response.json() as {
-      choices?: Array<{ message?: { content?: string | Array<{ type?: string; text?: string }> } }>
+      choices?: Array<{ finish_reason?: string; message?: { content?: string | Array<{ type?: string; text?: string }> } }>
     };
-    const content = payload.choices?.[0]?.message?.content;
-    const raw = (typeof content === 'string'
+    const choice = payload.choices?.[0];
+    const content = choice?.message?.content;
+    const rawContent = (typeof content === 'string'
       ? content
-      : Array.isArray(content) ? content.map(part => part.text ?? '').join('') : '').trim()
-      .replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/u, '');
-    if (!raw) return null;
-    const value = JSON.parse(raw) as Partial<AIConversationResult>;
-    if (typeof value.reply !== 'string' || typeof value.completed !== 'boolean') return null;
+      : Array.isArray(content) ? content.map(part => part.text ?? '').join('') : '').trim();
+    const raw = rawContent
+      .replace(/^\uFEFF/u, '')
+      .replace(/^\s*```(?:json)?\s*/iu, '')
+      .replace(/\s*```\s*$/u, '');
+    let value: Partial<AIConversationResult> | null = null;
+    try {
+      value = JSON.parse(raw) as Partial<AIConversationResult>;
+    } catch {
+      const first = raw.indexOf('{');
+      const last = raw.lastIndexOf('}');
+      if (first >= 0 && last > first) {
+        try { value = JSON.parse(raw.slice(first, last + 1)) as Partial<AIConversationResult>; } catch { /* invalid model output */ }
+      }
+    }
+    if (!value || typeof value.reply !== 'string' || !value.reply.trim()) {
+      app.log.error({ model: config.OPENROUTER_MODEL, finishReason: choice?.finish_reason, content: rawContent.slice(0, 1200) }, 'Conversational AI returned unusable output');
+      return null;
+    }
     return {
-      reply: value.reply.slice(0, 2500),
-      callerName: typeof value.callerName === 'string' ? value.callerName.slice(0, 100) : null,
-      callerPhone: typeof value.callerPhone === 'string' ? value.callerPhone.slice(0, 40) : null,
-      intent: typeof value.intent === 'string' ? value.intent.slice(0, 80) : null,
-      message: typeof value.message === 'string' ? value.message.slice(0, 2000) : null,
+      reply: value.reply.trim().slice(0, 2500),
+      callerName: typeof value.callerName === 'string' && value.callerName.trim() ? value.callerName.trim().slice(0, 100) : null,
+      callerPhone: typeof value.callerPhone === 'string' && value.callerPhone.trim() ? value.callerPhone.trim().slice(0, 40) : null,
+      intent: typeof value.intent === 'string' && value.intent.trim() ? value.intent.trim().slice(0, 80) : null,
+      message: typeof value.message === 'string' && value.message.trim() ? value.message.trim().slice(0, 2000) : null,
       callbackRequested: typeof value.callbackRequested === 'boolean' ? value.callbackRequested : null,
       priority: value.priority === 'urgent' ? 'urgent' : 'normal',
-      completed: value.completed
+      completed: value.completed === true
     };
   } catch (error) {
-    app.log.warn({ error }, 'OpenRouter request failed or returned invalid JSON; using deterministic receptionist fallback');
+    app.log.error({ error, model: config.OPENROUTER_MODEL }, 'Conversational AI request failed');
     return null;
   }
 }
@@ -280,51 +298,74 @@ app.post('/api/conversations/:id/messages', async (request, reply) => {
     current
   ).catch(error => { app.log.warn({ error }, 'OpenRouter request failed; using deterministic fallback'); return null; });
   const deterministicTurn = advanceConversation(current, parsed.data.text, config.OWNER_NAME);
-  const urgentFamilyIdentity = /\b(i am|i'm|this is|it's|it is|calling|jag är|det är|ringer som)\b.{0,45}\b(mom|mum|mother|dad|father|sister|brother|parent|mamma|morsa|pappa|syster|bror|förälder)\b|\b(your|his|her|hans|hennes)\s+(mom|mum|mother|dad|father|sister|brother|mamma|pappa|syster|bror)\b|أنا (أمك|أبوك|والدتك|والدك|أختك|أخوك)/iu.test(parsed.data.text);
-  const priority = aiResult?.priority === 'urgent' || urgentFamilyIdentity || deterministicTurn.state.priority === 'urgent' ? 'urgent' : 'normal';
-  const callerDeclinedExtra = current.stage === 'anything_else' && /^(no|nope|not really|that's all|that is all|nothing else|no thanks|nej|nä|det var allt|inget mer|لا|كلا|ليس هناك شيء آخر)$/iu.test(parsed.data.text.trim().replace(/[.!؟?]+$/u, ''));
-  const modelOrFallbackReadyToFinish = aiResult?.completed ?? deterministicTurn.completed;
-  // The deterministic parser owns the intake stage so model wording cannot skip
-  // required steps (especially the callback number and final add-more question).
-  const shouldAskAnythingElse = !callerDeclinedExtra && modelOrFallbackReadyToFinish && deterministicTurn.state.stage !== 'phone';
-  const nextStage: ConversationStage = callerDeclinedExtra
-    ? 'complete'
-    : deterministicTurn.state.stage === 'phone'
-      ? 'phone'
-      : shouldAskAnythingElse ? 'anything_else' : deterministicTurn.state.stage;
+  const callerText = parsed.data.text.trim();
+  const urgentFamilyIdentity = /\\b(i am|i'm|this is|it's|it is|calling|jag är|det är|ringer som)\\b.{0,45}\\b(mom|mum|mother|dad|father|sister|brother|parent|mamma|morsa|pappa|syster|bror|förälder)\\b|\\b(your|his|her|hans|hennes)\\s+(mom|mum|mother|dad|father|sister|brother|mamma|pappa|syster|bror)\\b|أنا (أمك|أبوك|والدتك|والدك|أختك|أخوك)/iu.test(callerText);
+  const priority = current.priority === 'urgent' || aiResult?.priority === 'urgent' || urgentFamilyIdentity || deterministicTurn.state.priority === 'urgent' ? 'urgent' : 'normal';
+  const normalized = callerText.toLowerCase().replace(/[.!؟?]+$/u, '').trim();
+  const callerDeclinedExtra = current.stage === 'anything_else' && /^(no|nope|not really|that's all|that is all|that's it|that is it|nothing else|no thanks|all good|i'm good|im good|nej|nä|det var allt|inget mer|det räcker|nej tack|لا|كلا|ليس هناك شيء آخر|هذا كل شيء)$/iu.test(normalized);
   const mergeMessage = (...values: Array<string | null | undefined>): string | null => {
     const parts: string[] = [];
     for (const value of values) {
       const clean = value?.trim();
-      if (clean && !parts.some(part => part.toLowerCase() === clean.toLowerCase() || part.toLowerCase().includes(clean.toLowerCase()))) parts.push(clean);
+      if (!clean) continue;
+      if (parts.some(part => part.toLowerCase().includes(clean.toLowerCase()) || clean.toLowerCase().includes(part.toLowerCase()))) {
+        const index = parts.findIndex(part => part.toLowerCase().includes(clean.toLowerCase()) || clean.toLowerCase().includes(part.toLowerCase()));
+        if (index >= 0 && clean.length > parts[index].length) parts[index] = clean;
+        continue;
+      }
+      parts.push(clean);
     }
     return parts.join(' | ').slice(0, 2000) || null;
   };
-  const nextState: ConversationState = callerDeclinedExtra
-    ? { ...deterministicTurn.state, stage: 'complete', priority }
-    : aiResult ? {
-      priority,
-      language: detectLanguage(parsed.data.text, current.language),
-      stage: nextStage,
-      callerName: urgentFamilyIdentity ? current.callerName ?? 'Yazoniii family member' : deterministicTurn.state.callerName ?? aiResult.callerName ?? current.callerName,
-      callerPhone: deterministicTurn.state.callerPhone ?? aiResult.callerPhone ?? current.callerPhone,
-      intent: aiResult.intent ?? deterministicTurn.state.intent ?? current.intent,
-      message: mergeMessage(current.message, deterministicTurn.state.message, aiResult.message),
-      callbackRequested: deterministicTurn.state.callbackRequested ?? aiResult.callbackRequested ?? current.callbackRequested
-    } : { ...deterministicTurn.state, stage: nextStage, priority };
+  const callbackRequested = aiResult?.callbackRequested ?? deterministicTurn.state.callbackRequested ?? current.callbackRequested;
+  const callerPhone = deterministicTurn.state.callerPhone ?? aiResult?.callerPhone ?? current.callerPhone;
+  const callbackNeedsNumber = callbackRequested === true && !callerPhone;
+  const modelAskedForMore = aiResult?.completed === true;
+  const nextStage: ConversationStage = callerDeclinedExtra
+    ? 'complete'
+    : callbackNeedsNumber
+      ? 'phone'
+      : modelAskedForMore
+        ? 'anything_else'
+        : current.stage === 'anything_else'
+          ? 'anything_else'
+          : 'reason';
+  const nextState: ConversationState = {
+    priority,
+    language: detectLanguage(callerText, current.language),
+    stage: nextStage,
+    callerName: urgentFamilyIdentity
+      ? aiResult?.callerName ?? current.callerName ?? 'Yazoniii family member'
+      : aiResult?.callerName ?? deterministicTurn.state.callerName ?? current.callerName,
+    callerPhone,
+    intent: aiResult?.intent ?? deterministicTurn.state.intent ?? current.intent,
+    message: mergeMessage(current.message, deterministicTurn.state.message, aiResult?.message),
+    callbackRequested
+  };
+  const finalSummary = deterministicTurn.reply;
   const languageCopy = {
-    en: { ask: 'Would you like to add anything else?', goodbye: /\b(goodbye|bye|see you)\b[.!…]*/giu },
-    sv: { ask: 'Vill du lägga till något mer?', goodbye: /\b(hej då|hejdå)\b[.!…]*/giu },
-    ar: { ask: 'هل ترغب في إضافة أي شيء آخر؟', goodbye: /إلى اللقاء[.!…]*/giu }
+    en: { ask: 'Would you like to add anything else?', goodbye: /\\b(goodbye|bye|see you)\\b[.!…]*/giu },
+    sv: { ask: 'Vill du lägga till något mer?', goodbye: /\\b(hej då|hejdå)\\b[.!…]*/giu },
+    ar: { ask: 'هل ترغب في إضافة أي شيء آخر؟', goodbye: /إلى اللقاء[.!…]*/gu }
   }[nextState.language];
-  const rawReply = callerDeclinedExtra
-    ? deterministicTurn.reply
-    : aiResult?.reply ?? deterministicTurn.reply;
-  const cleanedReply = rawReply.replace(languageCopy.goodbye, '').replace(/Would you like to add anything else\?/giu, '').replace(/Vill du lägga till något mer\?/giu, '').replace(/هل ترغب في إضافة أي شيء آخر؟/gu, '').trim();
+  let responseText = aiResult?.reply ?? deterministicTurn.reply;
+  if (callerDeclinedExtra) {
+    responseText = finalSummary;
+  } else if (callbackNeedsNumber && aiResult) {
+    const asksNumber = /\\b(number|phone|telephone|nummer|telefon|رقم|الهاتف)\\b/iu.test(aiResult.reply);
+    if (!asksNumber) responseText = nextState.language === 'sv'
+      ? 'Vilket nummer ska jag be Yazoniii ringa tillbaka till?'
+      : nextState.language === 'ar'
+        ? 'ما الرقم الذي تريد من Yazoniii الاتصال بك عليه؟'
+        : 'What number should Yazoniii call you back on?';
+  } else if (modelAskedForMore) {
+    const cleaned = responseText.replace(languageCopy.goodbye, '').trim();
+    if (!cleaned.toLowerCase().includes(languageCopy.ask.toLowerCase())) responseText = cleaned + ' ' + languageCopy.ask;
+  }
   const turn = {
     state: nextState,
     completed: callerDeclinedExtra,
-    reply: shouldAskAnythingElse ? `${cleanedReply} ${languageCopy.ask}`.trim() : rawReply
+    reply: responseText.trim().slice(0, 2500)
   };
   const now = new Date().toISOString();
   const update = await supabase.from('receptionist_conversations').update({
@@ -346,7 +387,7 @@ app.post('/api/conversations/:id/messages', async (request, reply) => {
     app.log.error({ error: assistantSaved.error }, 'Could not save receptionist response');
     return reply.code(503).send({ error: 'Could not save receptionist response.' });
   }
-  return { conversationId: row.id, language: turn.state.language, stage: turn.state.stage, priority: turn.state.priority, completed: turn.completed, reply: turn.reply };
+  return { conversationId: row.id, language: turn.state.language, stage: turn.state.stage, priority: turn.state.priority, completed: turn.completed, aiMode: aiResult ? 'ai' : 'fallback', reply: turn.reply };
 });
 
 app.get('/api/conversations', async (request, reply) => {
