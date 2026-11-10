@@ -220,7 +220,7 @@ async function generateReceptionistReply(
     const raw = (typeof content === 'string'
       ? content
       : Array.isArray(content) ? content.map(part => part.text ?? '').join('') : '').trim()
-      .replace(/^\`\`\`(?:json)?\s*/i, '').replace(/\s*\`\`\`$/u, '');
+      .replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/u, '');
     if (!raw) return null;
     const value = JSON.parse(raw) as Partial<AIConversationResult>;
     if (typeof value.reply !== 'string' || typeof value.completed !== 'boolean') return null;
