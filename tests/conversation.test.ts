@@ -147,7 +147,14 @@ describe('receptionist conversation', () => {
     let turn = createConversation('en');
     turn = advanceConversation(turn.state, 'Alex');
     turn = advanceConversation(turn.state, 'I have a problem with an appointment.');
-    turn = advanceConversation(turn.state, 'Please call me back after 3 PM.');
+    expect(turn.state.stage).toBe('reason');
+    expect(turn.reply).toContain('What went wrong');
+    turn = advanceConversation(turn.state, 'It was supposed to be tomorrow, but something went wrong.');
+    turn = advanceConversation(turn.state, 'Actually, sorry, I meant Thursday, not tomorrow.');
+    expect(turn.state.message).toContain('Thursday');
+    expect(turn.state.message).not.toContain('tomorrow');
+    turn = advanceConversation(turn.state, 'Could you ask Yazoniii to call me back after 3 PM?');
+    expect(turn.state.stage).toBe('phone');
     turn = advanceConversation(turn.state, '070 123 45 67');
     expect(turn.state.stage).toBe('anything_else');
     turn = advanceConversation(turn.state, "No, that's everything. Thank you.");
