@@ -339,7 +339,7 @@ app.post('/api/conversations/:id/messages', async (request, reply) => {
       : aiResult?.callerName ?? deterministicTurn.state.callerName ?? current.callerName,
     callerPhone,
     intent: aiResult?.intent ?? deterministicTurn.state.intent ?? current.intent,
-    message: mergeMessage(current.message, deterministicTurn.state.message, aiResult?.message),
+    message: aiResult?.message ?? mergeMessage(current.message, deterministicTurn.state.message),
     callbackRequested
   };
   const finalSummary = deterministicTurn.reply;
