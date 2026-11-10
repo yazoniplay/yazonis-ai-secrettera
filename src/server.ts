@@ -298,14 +298,14 @@ app.post('/api/conversations/:id/messages', async (request, reply) => {
       callbackRequested: aiResult.callbackRequested ?? current.callbackRequested
     } : { ...deterministicTurn.state, stage: shouldAskAnythingElse ? 'anything_else' : deterministicTurn.state.stage, priority };
   const languageCopy = {
-    en: { ask: 'Would you like to add anything else?', goodbye: /\\b(goodbye|bye|see you)\\b[.!…]*/giu },
-    sv: { ask: 'Vill du lägga till något mer?', goodbye: /\\b(hej då|hejdå)\\b[.!…]*/giu },
+    en: { ask: 'Would you like to add anything else?', goodbye: /\b(goodbye|bye|see you)\b[.!…]*/giu },
+    sv: { ask: 'Vill du lägga till något mer?', goodbye: /\b(hej då|hejdå)\b[.!…]*/giu },
     ar: { ask: 'هل ترغب في إضافة أي شيء آخر؟', goodbye: /إلى اللقاء[.!…]*/giu }
   }[nextState.language];
   const rawReply = callerDeclinedExtra
     ? deterministicTurn.reply
     : aiResult?.reply ?? deterministicTurn.reply;
-  const cleanedReply = rawReply.replace(languageCopy.goodbye, '').replace(/Would you like to add anything else\\?/giu, '').replace(/Vill du lägga till något mer\\?/giu, '').replace(/هل ترغب في إضافة أي شيء آخر؟/gu, '').trim();
+  const cleanedReply = rawReply.replace(languageCopy.goodbye, '').replace(/Would you like to add anything else\?/giu, '').replace(/Vill du lägga till något mer\?/giu, '').replace(/هل ترغب في إضافة أي شيء آخر؟/gu, '').trim();
   const turn = {
     state: nextState,
     completed: callerDeclinedExtra,
