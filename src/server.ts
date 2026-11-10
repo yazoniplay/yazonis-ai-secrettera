@@ -299,7 +299,7 @@ app.post('/api/conversations/:id/messages', async (request, reply) => {
   ).catch(error => { app.log.warn({ error }, 'OpenRouter request failed; using deterministic fallback'); return null; });
   const deterministicTurn = advanceConversation(current, parsed.data.text, config.OWNER_NAME);
   const callerText = parsed.data.text.trim();
-  const urgentFamilyIdentity = /\\b(i am|i'm|this is|it's|it is|calling|jag är|det är|ringer som)\\b.{0,45}\\b(mom|mum|mother|dad|father|sister|brother|parent|mamma|morsa|pappa|syster|bror|förälder)\\b|\\b(your|his|her|hans|hennes)\\s+(mom|mum|mother|dad|father|sister|brother|mamma|pappa|syster|bror)\\b|أنا (أمك|أبوك|والدتك|والدك|أختك|أخوك)/iu.test(callerText);
+  const urgentFamilyIdentity = /\b(i am|i'm|this is|it's|it is|calling|jag är|det är|ringer som)\b.{0,45}\b(mom|mum|mother|dad|father|sister|brother|parent|mamma|morsa|pappa|syster|bror|förälder)\b|\b(your|his|her|hans|hennes)\s+(mom|mum|mother|dad|father|sister|brother|mamma|pappa|syster|bror)\b|أنا (أمك|أبوك|والدتك|والدك|أختك|أخوك)/iu.test(callerText);
   const priority = current.priority === 'urgent' || aiResult?.priority === 'urgent' || urgentFamilyIdentity || deterministicTurn.state.priority === 'urgent' ? 'urgent' : 'normal';
   const normalized = callerText.toLowerCase().replace(/[.!؟?]+$/u, '').trim();
   const callerDeclinedExtra = current.stage === 'anything_else' && /^(no|nope|not really|that's all|that is all|that's it|that is it|nothing else|no thanks|all good|i'm good|im good|nej|nä|det var allt|inget mer|det räcker|nej tack|لا|كلا|ليس هناك شيء آخر|هذا كل شيء)$/iu.test(normalized);
@@ -344,15 +344,15 @@ app.post('/api/conversations/:id/messages', async (request, reply) => {
   };
   const finalSummary = deterministicTurn.reply;
   const languageCopy = {
-    en: { ask: 'Would you like to add anything else?', goodbye: /\\b(goodbye|bye|see you)\\b[.!…]*/giu },
-    sv: { ask: 'Vill du lägga till något mer?', goodbye: /\\b(hej då|hejdå)\\b[.!…]*/giu },
+    en: { ask: 'Would you like to add anything else?', goodbye: /\b(goodbye|bye|see you)\b[.!…]*/giu },
+    sv: { ask: 'Vill du lägga till något mer?', goodbye: /\b(hej då|hejdå)\b[.!…]*/giu },
     ar: { ask: 'هل ترغب في إضافة أي شيء آخر؟', goodbye: /إلى اللقاء[.!…]*/gu }
   }[nextState.language];
   let responseText = aiResult?.reply ?? deterministicTurn.reply;
   if (callerDeclinedExtra) {
     responseText = finalSummary;
   } else if (callbackNeedsNumber && aiResult) {
-    const asksNumber = /\\b(number|phone|telephone|nummer|telefon|رقم|الهاتف)\\b/iu.test(aiResult.reply);
+    const asksNumber = /\b(number|phone|telephone|nummer|telefon|رقم|الهاتف)\b/iu.test(aiResult.reply);
     if (!asksNumber) responseText = nextState.language === 'sv'
       ? 'Vilket nummer ska jag be Yazoniii ringa tillbaka till?'
       : nextState.language === 'ar'
