@@ -173,10 +173,16 @@ describe('receptionist conversation', () => {
     turn = advanceConversation(turn.state, 'I have a problem with an appointment.');
     expect(turn.state.stage).toBe('reason');
     expect(turn.reply).toContain('What went wrong');
-    turn = advanceConversation(turn.state, 'It was supposed to be tomorrow, but something went wrong.');
+    turn = advanceConversation(turn.state, 'It was supposed to be tomorrow, but I think something went wrong.');
+    expect(turn.state.stage).toBe('reason');
+    expect(turn.reply).toContain('What specifically went wrong');
     turn = advanceConversation(turn.state, 'Actually, sorry, I meant Thursday, not tomorrow.');
     expect(turn.state.message).toContain('Thursday');
     expect(turn.state.message).not.toContain('tomorrow');
+    expect(turn.state.stage).toBe('reason');
+    expect(turn.reply).toContain('What specifically went wrong');
+    turn = advanceConversation(turn.state, 'The appointment time was changed without telling me.');
+    expect(turn.state.stage).toBe('callback');
     turn = advanceConversation(turn.state, 'Could you ask Yazoniii to call me back after 3 PM?');
     expect(turn.state.stage).toBe('phone');
     turn = advanceConversation(turn.state, '070 123 45 67');
@@ -184,7 +190,19 @@ describe('receptionist conversation', () => {
     turn = advanceConversation(turn.state, "No, that's everything. Thank you.");
     expect(turn.completed).toBe(true);
     expect(turn.state.stage).toBe('complete');
-    expect(turn.reply).toContain('070 123 45 67');
+    expect(turn.reply).toContain('0701234567');
+    expect(turn.reply).toContain('preferred time: 3 PM');
+  });
+
+  it('includes a caller preferred callback time in the final read-back', () => {
+    let turn = createConversation('en');
+    turn = advanceConversation(turn.state, 'Alex');
+    turn = advanceConversation(turn.state, 'My appointment was cancelled.');
+    turn = advanceConversation(turn.state, 'Please call me back after 3 PM.');
+    turn = advanceConversation(turn.state, '070 123 45 67');
+    turn = advanceConversation(turn.state, "No, that's everything.");
+    expect(turn.completed).toBe(true);
+    expect(turn.reply).toContain('Callback: Requested (preferred time: 3 PM)');
   });
 
   it('does not complete on an ambiguous callback answer', () => {
