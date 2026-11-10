@@ -111,7 +111,12 @@ function isUrgent(value: string): boolean {
   return explicit || identifiesAsFamily || (family && request);
 }
 function isYes(value: string): boolean { return /^(yes|yeah|yep|sure|of course|please do|ja|japp|absolut|gärna|نعم|أجل|أكيد)$/iu.test(value.trim().replace(/[.!؟?]/gu, '')); }
-function isNo(value: string): boolean { return /^(no|nope|not really|that's all|that is all|that's it|nothing else|no thanks|nej|nä|det var allt|inget mer|لا|كلا|ليس هناك شيء آخر)$/iu.test(value.trim().replace(/[.!؟?]+$/gu, '').toLowerCase()); }
+export function isNoResponse(value: string): boolean {
+  const normalized = value.trim().toLowerCase().replace(/[’]/gu, "'")
+    .replace(/[.!؟?،,;:]+/gu, ' ').replace(/\s+/gu, ' ').trim()
+    .replace(/\s+(?:thank you|thanks|cheers|tack|شكراً|شكرا)$/iu, '').trim();
+  return /^(?:no|nope|nah|not really|no that's all|no that is all|no that's everything|no that is everything|no that's it|no that is it|nothing else|no thanks|all good|i'm good|im good|nej|nä|nej tack|det var allt|inget mer|det räcker|لا|كلا|ليس هناك شيء آخر|هذا كل شيء)$/iu.test(normalized);
+}
 function validPhone(value: string): boolean {
   const digits = value.replace(/\D/gu, '');
   return digits.length >= 7 && digits.length <= 15 && /^[+\d(][\d\s().+-]*$/u.test(value.trim());
@@ -128,6 +133,13 @@ function looksLikeReason(value: string): boolean {
   return /\b(calling because|calling about|need to speak|problem|issue|appointment|meeting|booking|order|question|wanted to|need help|regarding)\b|\b(gäller|angående|problem|tid|möte|bokning|fråga|hjälp)\b|موعد|مشكلة|اتصل بسبب/iu.test(value);
 }
 
+export function buildCompletionReply(state: ConversationState, ownerName = 'Yazoniii'): string {
+  return prompts[state.language].completedMessage(
+    ownerName, state.callerName, state.priority === 'urgent',
+    state.message, state.callerPhone, state.callbackRequested
+  );
+}
+
 export function advanceConversation(current: ConversationState, callerText: string, ownerName = 'Yazoniii'): ConversationTurn {
   const text = callerText.trim().slice(0, 2000);
   const language = detectLanguage(text, current.language);
@@ -136,10 +148,10 @@ export function advanceConversation(current: ConversationState, callerText: stri
   const urgent = isUrgent(text);
   if (urgent) state.priority = 'urgent';
   if (!text) return { state, reply: copy.askReason(state.callerName), completed: false };
-  if (state.stage === 'complete') return { state, reply: copy.completedMessage(ownerName, state.callerName, state.priority === 'urgent', state.message, state.callerPhone, state.callbackRequested), completed: true };
+  if (state.stage === 'complete') return { state, reply: buildCompletionReply(state, ownerName), completed: true };
 
   if (state.stage === 'anything_else') {
-    if (isNo(text)) {
+    if (isNoResponse(text)) {
       state.stage = 'complete';
       return { state, reply: copy.completedMessage(ownerName, state.callerName, state.priority === 'urgent', state.message, state.callerPhone, state.callbackRequested), completed: true };
     }
@@ -203,7 +215,7 @@ export function advanceConversation(current: ConversationState, callerText: stri
       state.stage = 'anything_else';
       return { state, reply: copy.askAnythingElse, completed: false };
     }
-    if (isNo(text)) {
+    if (isNoResponse(text)) {
       state.callbackRequested = false;
       state.stage = 'anything_else';
       return { state, reply: copy.askAnythingElse, completed: false };
