@@ -2,6 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { advanceConversation, createConversation, isNoResponse } from '../src/conversation.js';
 
 describe('receptionist conversation', () => {
+  it('extracts a caller name from a natural greeting', () => {
+    const turn = advanceConversation(createConversation('en').state, "Hi, I'm Alex.");
+    expect(turn.state.callerName).toBe('Alex');
+    expect(turn.reply).toBe('Thanks, Alex. What can I help you with?');
+  });
+
   it('collects a name, reason and callback choice in English', () => {
     let turn = createConversation('en');
     expect(turn.reply).toContain('Who am I speaking with?');
@@ -42,6 +48,24 @@ describe('receptionist conversation', () => {
     expect(turn.reply).toContain('Sam');
   });
 
+
+  it('extracts Swedish phone numbers from natural language replies', () => {
+    let turn = createConversation('en');
+    turn = advanceConversation(turn.state, 'Alex');
+    turn = advanceConversation(turn.state, 'I need help with an appointment');
+    turn = advanceConversation(turn.state, 'Yes, please call me back');
+    turn = advanceConversation(turn.state, 'My number is 070 123 45 67.');
+    expect(turn.state.callerPhone).toBe('0701234567');
+    expect(turn.state.stage).toBe('anything_else');
+
+    let international = createConversation('en');
+    international = advanceConversation(international.state, 'Alex');
+    international = advanceConversation(international.state, 'I need help with an appointment');
+    international = advanceConversation(international.state, 'Yes, please call me back');
+    international = advanceConversation(international.state, 'My number is +46707358046');
+    expect(international.state.callerPhone).toBe('+46707358046');
+    expect(international.state.stage).toBe('anything_else');
+  });
 
   it('uses incoming caller ID automatically and never asks the caller to repeat it', () => {
     let turn = createConversation('en', '+46701234567');
