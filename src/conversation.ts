@@ -126,6 +126,18 @@ function appendMessage(existing: string | null, next: string): string {
   if (existing.toLowerCase().includes(next.toLowerCase())) return existing;
   return `${existing} | ${next}`.slice(0, 2000);
 }
+
+function applyCallerCorrection(existing: string | null, next: string): string {
+  const correction = next.match(/\b(?:actually[, ]+)?(?:sorry[, ]+)?i meant\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday|today|tomorrow|yesterday)\s*,?\s+not\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday|today|tomorrow|yesterday)\b/iu);
+  if (correction && existing) {
+    const corrected = correction[1];
+    const oldValue = correction[2];
+    const replaced = existing.replace(new RegExp('\\b' + oldValue + '\\b', 'giu'), corrected);
+    return replaced === existing ? appendMessage(existing, next) : replaced;
+  }
+  return appendMessage(existing, next);
+}
+
 function mentionsCallback(value: string): boolean {
   return /\b(call me back|call back|callback|ring me|ring back|phone me|återkomma|ringa tillbaka|ring mig|معاودة الاتصال|اتصل بي مجدداً)\b/iu.test(value);
 }
@@ -198,8 +210,12 @@ export function advanceConversation(current: ConversationState, callerText: stri
         if (parsed.remainder) state.message = appendMessage(state.message, parsed.remainder);
       }
     }
-    if (!state.message || !state.message.toLowerCase().includes(text.toLowerCase())) state.message = appendMessage(state.message, text);
+    state.message = applyCallerCorrection(state.message, text);
     state.intent = classifyIntent(state.message);
+    if (/\b(?:problem|issue) with (?:an? )?appointment\b/iu.test(state.message)
+      && !/\b(?:cancelled|canceled|changed|rescheduled|wrong date|double[- ]booked|not booked|missing|incorrect|error|mistake|supposed to be|was meant to be)\b/iu.test(state.message)) {
+      return { state, reply: language === 'sv' ? 'Vad har hänt med mötet eller bokningen?' : language === 'ar' ? 'ما المشكلة التي حدثت في الموعد؟' : 'What went wrong with the appointment?', completed: false };
+    }
     state.stage = 'callback';
     return { state, reply: copy.askCallback(ownerName, Boolean(state.callerPhone), state.priority === 'urgent'), completed: false };
   }
@@ -220,7 +236,7 @@ export function advanceConversation(current: ConversationState, callerText: stri
       state.stage = 'anything_else';
       return { state, reply: copy.askAnythingElse, completed: false };
     }
-    state.message = appendMessage(state.message, text);
+    state.message = applyCallerCorrection(state.message, text);
     state.intent = classifyIntent(state.message);
     return { state, reply: `Got it — I’ve updated the message. ${copy.askCallback(ownerName, Boolean(state.callerPhone), state.priority === 'urgent')}`, completed: false };
   }
