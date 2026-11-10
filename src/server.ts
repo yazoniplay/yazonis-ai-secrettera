@@ -369,7 +369,7 @@ app.post('/api/conversations/:id/messages', async (request, reply) => {
   };
   const now = new Date().toISOString();
   const update = await supabase.from('receptionist_conversations').update({
-    language: turn.state.language, stage: turn.completed ? 'anything_else' : turn.state.stage,
+    language: turn.state.language, stage: turn.state.stage,
     status: turn.completed ? 'completed' : 'open',
     caller_name: turn.state.callerName, caller_phone: turn.state.callerPhone,
     intent: turn.state.intent, message: turn.state.message,
