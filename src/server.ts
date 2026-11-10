@@ -284,19 +284,34 @@ app.post('/api/conversations/:id/messages', async (request, reply) => {
   const priority = aiResult?.priority === 'urgent' || urgentFamilyIdentity || deterministicTurn.state.priority === 'urgent' ? 'urgent' : 'normal';
   const callerDeclinedExtra = current.stage === 'anything_else' && /^(no|nope|not really|that's all|that is all|nothing else|no thanks|nej|nä|det var allt|inget mer|لا|كلا|ليس هناك شيء آخر)$/iu.test(parsed.data.text.trim().replace(/[.!؟?]+$/u, ''));
   const modelOrFallbackReadyToFinish = aiResult?.completed ?? deterministicTurn.completed;
-  const shouldAskAnythingElse = !callerDeclinedExtra && modelOrFallbackReadyToFinish;
+  // The deterministic parser owns the intake stage so model wording cannot skip
+  // required steps (especially the callback number and final add-more question).
+  const shouldAskAnythingElse = !callerDeclinedExtra && modelOrFallbackReadyToFinish && deterministicTurn.state.stage !== 'phone';
+  const nextStage: ConversationStage = callerDeclinedExtra
+    ? 'complete'
+    : deterministicTurn.state.stage === 'phone'
+      ? 'phone'
+      : shouldAskAnythingElse ? 'anything_else' : deterministicTurn.state.stage;
+  const mergeMessage = (...values: Array<string | null | undefined>): string | null => {
+    const parts: string[] = [];
+    for (const value of values) {
+      const clean = value?.trim();
+      if (clean && !parts.some(part => part.toLowerCase() === clean.toLowerCase() || part.toLowerCase().includes(clean.toLowerCase()))) parts.push(clean);
+    }
+    return parts.join(' | ').slice(0, 2000) || null;
+  };
   const nextState: ConversationState = callerDeclinedExtra
-    ? { ...deterministicTurn.state, priority }
+    ? { ...deterministicTurn.state, stage: 'complete', priority }
     : aiResult ? {
       priority,
       language: detectLanguage(parsed.data.text, current.language),
-      stage: shouldAskAnythingElse ? 'anything_else' : 'reason',
-      callerName: urgentFamilyIdentity ? current.callerName ?? 'Yazoniii family member' : aiResult.callerName ?? current.callerName,
-      callerPhone: aiResult.callerPhone ?? current.callerPhone,
-      intent: aiResult.intent ?? current.intent,
-      message: aiResult.message ?? current.message,
-      callbackRequested: aiResult.callbackRequested ?? current.callbackRequested
-    } : { ...deterministicTurn.state, stage: shouldAskAnythingElse ? 'anything_else' : deterministicTurn.state.stage, priority };
+      stage: nextStage,
+      callerName: urgentFamilyIdentity ? current.callerName ?? 'Yazoniii family member' : deterministicTurn.state.callerName ?? aiResult.callerName ?? current.callerName,
+      callerPhone: deterministicTurn.state.callerPhone ?? aiResult.callerPhone ?? current.callerPhone,
+      intent: aiResult.intent ?? deterministicTurn.state.intent ?? current.intent,
+      message: mergeMessage(current.message, deterministicTurn.state.message, aiResult.message),
+      callbackRequested: deterministicTurn.state.callbackRequested ?? aiResult.callbackRequested ?? current.callbackRequested
+    } : { ...deterministicTurn.state, stage: nextStage, priority };
   const languageCopy = {
     en: { ask: 'Would you like to add anything else?', goodbye: /\b(goodbye|bye|see you)\b[.!…]*/giu },
     sv: { ask: 'Vill du lägga till något mer?', goodbye: /\b(hej då|hejdå)\b[.!…]*/giu },
