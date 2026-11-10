@@ -78,12 +78,12 @@ export function createConversation(language: SupportedLanguage = 'en', callerPho
   return { state, reply: `${copy.greeting} ${copy.askName}`, completed: false };
 }
 function cleanName(value: string): string {
-  return value.trim().replace(/^(?:hi|hello|hey)[,!\\s]+/iu, '')
-    .replace(/^(my name is|i am|i'm|this is|it's|it is|jag heter|mitt namn är|jag är|اسمي|أنا)\\s+/iu, '')
+  return value.trim().replace(/^(?:hi|hello|hey)[,!\s]+/iu, '')
+    .replace(/^(my name is|i am|i'm|this is|it's|it is|jag heter|mitt namn är|jag är|اسمي|أنا)\s+/iu, '')
     .replace(/[.!?،،]+$/u, '').slice(0, 100);
 }
 function extractName(value: string): { name: string | null; remainder: string } {
-  const normalized = value.trim().replace(/^(?:hi|hello|hey)[,!\\s]+/iu, '');
+  const normalized = value.trim().replace(/^(?:hi|hello|hey)[,!\s]+/iu, '');
   const patterns = [
     /^(?:my name is|this is|i am|i'm|it's|it is)\s+([A-Z][\p{L}'-]{1,35})(?:\s*[,.!?]\s*|\s+)([\s\S]*)$/iu,
     /^(?:jag heter|mitt namn är)\s+([\p{L}'-]{2,35})(?:\s*[,.!?]\s*|\s+)([\s\S]*)$/iu,
@@ -93,7 +93,7 @@ function extractName(value: string): { name: string | null; remainder: string } 
     const match = normalized.match(pattern);
     if (match) return { name: match[1], remainder: (match[2] || '').trim() };
   }
-  if (/^(?:my name is|this is|i am|i'm|it's|it is|jag heter|mitt namn är|اسمي)\\s+[\\p{L}'-]{2,35}[.!?]?$/iu.test(normalized)) {
+  if (/^(?:my name is|this is|i am|i'm|it's|it is|jag heter|mitt namn är|اسمي)\s+[\p{L}'-]{2,35}[.!?]?$/iu.test(normalized)) {
     return { name: cleanName(normalized), remainder: '' };
   }
   return { name: null, remainder: '' };
@@ -121,15 +121,15 @@ export function isNoResponse(value: string): boolean {
   return /^(?:no|nope|nah|not really|that's all|that is all|that's everything|that is everything|that's it|that is it|no that's all|no that is all|no that's everything|no that is everything|no that's it|no that is it|nothing else|no thanks|all good|i'm good|im good|nej|nä|nej tack|det var allt|inget mer|det räcker|لا|كلا|ليس هناك شيء آخر|هذا كل شيء)$/iu.test(normalized);
 }
 function validPhone(value: string): boolean {
-  const digits = value.replace(/\\D/gu, '');
-  return digits.length >= 7 && digits.length <= 15 && /^[+\\d(][\\d\\s().+-]*$/u.test(value.trim());
+  const digits = value.replace(/\D/gu, '');
+  return digits.length >= 7 && digits.length <= 15 && /^\+?\d[\d\s().-]*$/u.test(value.trim());
 }
 
 function extractPhone(value: string): string | null {
   // Extract a number from natural replies such as "My number is 070 123 45 67".
-  const candidates = value.match(/\\+?\\d(?:[\\d\\s().-]*\\d)?/gu) ?? [];
+  const candidates = value.match(/\+?\d(?:[\d\s().-]*\d)?/gu) ?? [];
   for (const candidate of candidates) {
-    const normalized = candidate.trim().replace(/[\\s().-]/gu, '');
+    const normalized = candidate.trim().replace(/[\s().-]/gu, '');
     if (validPhone(normalized)) return normalized;
   }
   return null;
