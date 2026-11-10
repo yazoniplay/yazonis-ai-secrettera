@@ -210,7 +210,16 @@ async function generateReceptionistReply(
       signal: AbortSignal.timeout(18000)
     });
     if (!response.ok) {
-      app.log.warn({ status: response.status }, 'OpenRouter unavailable; using deterministic receptionist fallback');
+      const errorBody = await response.text().catch(() => '');
+      app.log.warn({
+        status: response.status,
+        model: config.OPENROUTER_MODEL,
+        providerError: errorBody.slice(0, 1200),
+        rateLimitLimit: response.headers.get('x-ratelimit-limit'),
+        rateLimitRemaining: response.headers.get('x-ratelimit-remaining'),
+        rateLimitReset: response.headers.get('x-ratelimit-reset'),
+        retryAfter: response.headers.get('retry-after')
+      }, 'OpenRouter request rejected; using deterministic receptionist fallback');
       return null;
     }
     const payload = await response.json() as {
