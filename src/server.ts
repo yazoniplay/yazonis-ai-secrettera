@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { config } from './config.js';
 import { evaluateAvailability, type ManualStatus } from './availability.js';
 import { detectLanguage, getReceptionPhrases, type SupportedLanguage } from './language.js';
-import { advanceConversation, createConversation, type ConversationState, type ConversationStage } from './conversation.js';
+import { advanceConversation, buildCompletionReply, createConversation, isNoResponse, type ConversationState, type ConversationStage } from './conversation.js';
 
 const app = Fastify({ logger: true });
 const supabase = createClient(config.SUPABASE_URL, config.SUPABASE_PUBLISHABLE_KEY, {
@@ -183,10 +183,11 @@ async function generateReceptionistReply(
     'You are Yazonis Secrettera, a capable human-style receptionist for ' + config.OWNER_NAME + '.',
     'Your job is to have a genuine conversation, not to run a questionnaire. Respond to the caller’s latest message in context. Be natural, concise, attentive and specific. Never repeat a question if the caller already answered it.',
     'Use the entire conversation history. A caller may give information out of order, correct earlier information, answer multiple questions at once, change their mind, or add details while you are asking something else. Understand the meaning rather than demanding yes/no answers.',
-    'Ask at most ONE question in a reply, and only ask for information that is genuinely missing. If the caller gives a correction, acknowledge it and replace the old detail. If they give a callback time, retain it as part of the message. If they ask for a callback, record it; only ask for a phone number if no caller ID or number has been provided.',
-    'Capture caller name/identity, phone or caller ID, the actual message/reason, callback preference and any preferred callback time. Keep the message faithful to the caller; do not invent facts. Keep all earlier details unless corrected.',
+    'Ask at most ONE question in a reply, and only ask for information that is genuinely missing. Never ask for a phone number merely because the caller has introduced themselves or mentioned a problem. First understand and record what happened. Only ask about a callback after you understand the reason; only ask for a phone number after the caller explicitly requests or accepts a callback and no number/caller ID is available. Never repeat a question that has already been answered.',
+    'Use the whole conversation to maintain a concise, canonical message. When the caller corrects a detail such as a date, replace the incorrect detail everywhere in the canonical message and summary. Do not describe both values as if both are still valid. Preserve unrelated details.',
+    'Capture caller name/identity, phone or caller ID, the actual message/reason, callback preference and any preferred callback time. Keep the message faithful to the caller; do not invent facts. A callback is requested only when the caller explicitly asks for one or clearly accepts your callback offer. Do not infer callback consent from the fact that they have a problem.',
     'When enough details have been collected, read back a concise summary containing caller, phone (or Not provided), message, callback preference and priority. Then ask exactly one natural equivalent of “Would you like to add anything else?” Do not say goodbye yet.',
-    'Only complete after the caller clearly says they have nothing else to add AFTER that final question. If they add anything, incorporate it and ask whether there is anything else again. A request for a callback is not consent to end the conversation.',
+    'If the caller clearly says no, no thanks, that is everything, that is all, or an equivalent phrase (including a polite ending such as “No, that’s everything. Thank you”), complete immediately. Do not ask whether they want to add anything else again. If they add a detail instead, incorporate it and ask the add-more question again. A request for a callback is not consent to end the conversation.',
     'URGENT POLICY: identifying as the owner’s mother, father, sister, brother, parent or close family member is URGENT. Explicit emergencies and urgent/immediate requests are URGENT. A casual third-person mention is not enough. Never downgrade urgent priority.',
     'For a family caller, callerName should preserve their relationship (for example “Mother” or “Sister”); include their personal name too if provided.',
     'Reply in the language the caller is using: English, Swedish or Arabic. Preserve the language unless they switch.',
@@ -301,8 +302,7 @@ app.post('/api/conversations/:id/messages', async (request, reply) => {
   const callerText = parsed.data.text.trim();
   const urgentFamilyIdentity = /\b(i am|i'm|this is|it's|it is|calling|jag är|det är|ringer som)\b.{0,45}\b(mom|mum|mother|dad|father|sister|brother|parent|mamma|morsa|pappa|syster|bror|förälder)\b|\b(your|his|her|hans|hennes)\s+(mom|mum|mother|dad|father|sister|brother|mamma|pappa|syster|bror)\b|أنا (أمك|أبوك|والدتك|والدك|أختك|أخوك)/iu.test(callerText);
   const priority = current.priority === 'urgent' || aiResult?.priority === 'urgent' || urgentFamilyIdentity || deterministicTurn.state.priority === 'urgent' ? 'urgent' : 'normal';
-  const normalized = callerText.toLowerCase().replace(/[.!؟?]+$/u, '').trim();
-  const callerDeclinedExtra = current.stage === 'anything_else' && /^(no|nope|not really|that's all|that is all|that's it|that is it|nothing else|no thanks|all good|i'm good|im good|nej|nä|det var allt|inget mer|det räcker|nej tack|لا|كلا|ليس هناك شيء آخر|هذا كل شيء)$/iu.test(normalized);
+  const callerDeclinedExtra = current.stage === 'anything_else' && isNoResponse(callerText);
   const mergeMessage = (...values: Array<string | null | undefined>): string | null => {
     const parts: string[] = [];
     for (const value of values) {
@@ -317,7 +317,10 @@ app.post('/api/conversations/:id/messages', async (request, reply) => {
     }
     return parts.join(' | ').slice(0, 2000) || null;
   };
-  const callbackRequested = aiResult?.callbackRequested ?? deterministicTurn.state.callbackRequested ?? current.callbackRequested;
+  const explicitCallbackSignal = /\b(call me back|call back|callback|ring me|ring back|phone me|återkomma|ringa tillbaka|ring mig|معاودة الاتصال|اتصل بي مجدداً)\b/iu.test(callerText)
+    || (current.stage === 'callback' && /^(yes|yeah|yep|sure|of course|please do|ja|japp|absolut|gärna|نعم|أجل|أكيد)[.!؟?]*$/iu.test(callerText));
+  const callbackRequested = deterministicTurn.state.callbackRequested
+    ?? (explicitCallbackSignal ? aiResult?.callbackRequested ?? true : current.callbackRequested);
   const callerPhone = deterministicTurn.state.callerPhone ?? aiResult?.callerPhone ?? current.callerPhone;
   const callbackNeedsNumber = callbackRequested === true && !callerPhone;
   const modelAskedForMore = aiResult?.completed === true;
@@ -342,15 +345,19 @@ app.post('/api/conversations/:id/messages', async (request, reply) => {
     message: aiResult?.message ?? mergeMessage(current.message, deterministicTurn.state.message),
     callbackRequested
   };
-  const finalSummary = deterministicTurn.reply;
+  const finalSummary = buildCompletionReply(nextState, config.OWNER_NAME);
   const languageCopy = {
     en: { ask: 'Would you like to add anything else?', goodbye: /\b(goodbye|bye|see you)\b[.!…]*/giu },
     sv: { ask: 'Vill du lägga till något mer?', goodbye: /\b(hej då|hejdå)\b[.!…]*/giu },
     ar: { ask: 'هل ترغب في إضافة أي شيء آخر؟', goodbye: /إلى اللقاء[.!…]*/gu }
   }[nextState.language];
   let responseText = aiResult?.reply ?? deterministicTurn.reply;
+  const modelAsksForPhoneTooEarly = callbackRequested !== true
+    && /\b(phone number|telephone number|what number|which number|number should|provide your number|share your number|telefonnummer|vilket nummer|ما الرقم)\b/iu.test(responseText);
   if (callerDeclinedExtra) {
     responseText = finalSummary;
+  } else if (modelAsksForPhoneTooEarly) {
+    responseText = deterministicTurn.reply;
   } else if (callbackNeedsNumber && aiResult) {
     const asksNumber = /\b(number|phone|telephone|nummer|telefon|رقم|الهاتف)\b/iu.test(aiResult.reply);
     if (!asksNumber) responseText = nextState.language === 'sv'
