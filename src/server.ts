@@ -182,7 +182,10 @@ async function generateReceptionistReply(
     'Understand interruptions, fragments, corrections, multiple details in one sentence, changes of mind, and unexpected but relevant replies. Use the entire transcript and current state. Do not ask for information already provided. Ask only one useful follow-up question at a time.',
     'Collect and preserve the caller identity/name, caller phone (if supplied), reason/message, callback preference, and callback number if requested and no caller ID exists.',
     'URGENT POLICY: A caller identifying themselves as the owner’s mother, father, sister, brother, parent or close family member is URGENT even without saying emergency. Explicit emergencies and urgent/immediate requests are also URGENT. A casual third-person mention of family is not enough. Never downgrade an already urgent conversation.',
-    'When enough details are collected, finish with a read-back that tells the caller exactly what will be sent to ' + config.OWNER_NAME + '. Include caller identity/name, phone (or Not provided), exact message/reason, callback preference, and priority. The read-back must match the structured fields. Never claim it has already been delivered or seen.',
+    'Have a real, fluid conversation rather than conducting a rigid intake form. Respond to what the caller actually says, acknowledge relevant context briefly, handle side questions and corrections, and ask one natural follow-up only when it is useful. Do not force the caller through fixed stages or repeat questions.',
+    'Keep track of all useful details across the full transcript. If the caller gives several details at once, capture them together. If they add or correct something later, update the summary instead of ignoring it.',
+    'When you have enough information, give a concise read-back of what will be passed to ' + config.OWNER_NAME + ' (caller identity/name, phone or Not provided, exact reason/message, callback preference, priority), then ask: “Would you like to add anything else?” Do NOT say goodbye and do NOT mark the conversation completed yet.',
+    'Only finish after the caller clearly says no, that is all, or an equivalent. If they say yes, ask what else they would like to add. If they provide another detail, incorporate it and ask again whether they would like to add anything else. Never end the conversation immediately after receiving the original message.',
     'If the caller is a family member, preserve their relationship as callerName, such as "Mother" or "Sister", unless they also give their personal name; then include both.',
     'Reply in the caller’s language: English, Swedish or Arabic. Keep the conversation in the language the caller is using unless they switch.',
     'Return ONLY valid JSON with keys reply, callerName, callerPhone, intent, message, callbackRequested, priority, completed. Use null for unknown values; priority must be normal or urgent; completed must be boolean. Do not wrap JSON in markdown.',
@@ -204,7 +207,7 @@ async function generateReceptionistReply(
           { role: 'system', content: system },
           { role: 'user', content: 'Continue the receptionist conversation using the transcript and return the required JSON.' }
         ],
-        temperature: 0.35,
+        temperature: 0.7,
         max_tokens: 850
       }),
       signal: AbortSignal.timeout(18000)
@@ -279,20 +282,34 @@ app.post('/api/conversations/:id/messages', async (request, reply) => {
   const deterministicTurn = advanceConversation(current, parsed.data.text, config.OWNER_NAME);
   const urgentFamilyIdentity = /\b(i am|i'm|this is|it's|it is|calling|jag är|det är|ringer som)\b.{0,45}\b(mom|mum|mother|dad|father|sister|brother|parent|mamma|morsa|pappa|syster|bror|förälder)\b|\b(your|his|her|hans|hennes)\s+(mom|mum|mother|dad|father|sister|brother|mamma|pappa|syster|bror)\b|أنا (أمك|أبوك|والدتك|والدك|أختك|أخوك)/iu.test(parsed.data.text);
   const priority = aiResult?.priority === 'urgent' || urgentFamilyIdentity || deterministicTurn.state.priority === 'urgent' ? 'urgent' : 'normal';
-  const nextState: ConversationState = aiResult ? {
-    priority,
-    language: detectLanguage(parsed.data.text, current.language),
-    stage: aiResult.completed ? 'complete' : 'reason',
-    callerName: urgentFamilyIdentity ? current.callerName ?? 'Yazoniii family member' : aiResult.callerName ?? current.callerName,
-    callerPhone: aiResult.callerPhone ?? current.callerPhone,
-    intent: aiResult.intent ?? current.intent,
-    message: aiResult.message ?? current.message,
-    callbackRequested: aiResult.callbackRequested ?? current.callbackRequested
-  } : { ...deterministicTurn.state, priority };
+  const callerDeclinedExtra = current.stage === 'anything_else' && /^(no|nope|not really|that's all|that is all|nothing else|no thanks|nej|nä|det var allt|inget mer|لا|كلا|ليس هناك شيء آخر)$/iu.test(parsed.data.text.trim().replace(/[.!؟?]+$/u, ''));
+  const modelOrFallbackReadyToFinish = aiResult?.completed ?? deterministicTurn.completed;
+  const shouldAskAnythingElse = !callerDeclinedExtra && modelOrFallbackReadyToFinish;
+  const nextState: ConversationState = callerDeclinedExtra
+    ? { ...deterministicTurn.state, priority }
+    : aiResult ? {
+      priority,
+      language: detectLanguage(parsed.data.text, current.language),
+      stage: shouldAskAnythingElse ? 'anything_else' : 'reason',
+      callerName: urgentFamilyIdentity ? current.callerName ?? 'Yazoniii family member' : aiResult.callerName ?? current.callerName,
+      callerPhone: aiResult.callerPhone ?? current.callerPhone,
+      intent: aiResult.intent ?? current.intent,
+      message: aiResult.message ?? current.message,
+      callbackRequested: aiResult.callbackRequested ?? current.callbackRequested
+    } : { ...deterministicTurn.state, stage: shouldAskAnythingElse ? 'anything_else' : deterministicTurn.state.stage, priority };
+  const languageCopy = {
+    en: { ask: 'Would you like to add anything else?', goodbye: /\\b(goodbye|bye|see you)\\b[.!…]*/giu },
+    sv: { ask: 'Vill du lägga till något mer?', goodbye: /\\b(hej då|hejdå)\\b[.!…]*/giu },
+    ar: { ask: 'هل ترغب في إضافة أي شيء آخر؟', goodbye: /إلى اللقاء[.!…]*/giu }
+  }[nextState.language];
+  const rawReply = callerDeclinedExtra
+    ? deterministicTurn.reply
+    : aiResult?.reply ?? deterministicTurn.reply;
+  const cleanedReply = rawReply.replace(languageCopy.goodbye, '').replace(/Would you like to add anything else\\?/giu, '').replace(/Vill du lägga till något mer\\?/giu, '').replace(/هل ترغب في إضافة أي شيء آخر؟/gu, '').trim();
   const turn = {
     state: nextState,
-    completed: aiResult?.completed ?? deterministicTurn.completed,
-    reply: aiResult?.reply ?? deterministicTurn.reply
+    completed: callerDeclinedExtra,
+    reply: shouldAskAnythingElse ? `${cleanedReply} ${languageCopy.ask}`.trim() : rawReply
   };
   const now = new Date().toISOString();
   const update = await supabase.from('receptionist_conversations').update({
