@@ -115,7 +115,7 @@ export function isNoResponse(value: string): boolean {
   const normalized = value.trim().toLowerCase().replace(/[’]/gu, "'")
     .replace(/[.!؟?،,;:]+/gu, ' ').replace(/\s+/gu, ' ').trim()
     .replace(/\s+(?:thank you|thanks|cheers|tack|شكراً|شكرا)$/iu, '').trim();
-  return /^(?:no|nope|nah|not really|no that's all|no that is all|no that's everything|no that is everything|no that's it|no that is it|nothing else|no thanks|all good|i'm good|im good|nej|nä|nej tack|det var allt|inget mer|det räcker|لا|كلا|ليس هناك شيء آخر|هذا كل شيء)$/iu.test(normalized);
+  return /^(?:no|nope|nah|not really|that's all|that is all|that's everything|that is everything|that's it|that is it|no that's all|no that is all|no that's everything|no that is everything|no that's it|no that is it|nothing else|no thanks|all good|i'm good|im good|nej|nä|nej tack|det var allt|inget mer|det räcker|لا|كلا|ليس هناك شيء آخر|هذا كل شيء)$/iu.test(normalized);
 }
 function validPhone(value: string): boolean {
   const digits = value.replace(/\D/gu, '');
