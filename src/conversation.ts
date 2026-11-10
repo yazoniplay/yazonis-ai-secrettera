@@ -155,16 +155,16 @@ function mentionsCallback(value: string): boolean {
   return /\b(call me back|call back|callback|ring me|ring back|phone me|återkomma|ringa tillbaka|ring mig|معاودة الاتصال|اتصل بي مجدداً)\b/iu.test(value);
 }
 function looksLikeReason(value: string): boolean {
-  return /\\b(calling because|calling about|need to speak|problem|issue|appointment|meeting|booking|order|question|wanted to|need help|regarding)\\b|\\b(gäller|angående|problem|tid|möte|bokning|fråga|hjälp)\\b|موعد|مشكلة|اتصل بسبب/iu.test(value);
+  return /\b(calling because|calling about|need to speak|problem|issue|appointment|meeting|booking|order|question|wanted to|need help|regarding)\b|\b(gäller|angående|problem|tid|möte|bokning|fråga|hjälp)\b|موعد|مشكلة|اتصل بسبب/iu.test(value);
 }
 
 function hasSpecificAppointmentProblem(value: string): boolean {
-  return /\\b(cancelled|canceled|cancel|changed|rescheduled|wrong date|double[- ]booked|not booked|missing|incorrect|error|mistake|confirmation|no confirmation|wrong time|time changed|charged|payment|couldn't attend|could not attend)\\b|\\b(inställt|avbokat|ändrat|ombokat|fel datum|dubbelbokat|saknas|felaktigt|bekräftelse|betalning)\\b|أُلغي|ملغي|تغيير الموعد|موعد خاطئ|خطأ في الحجز/iu.test(value);
+  return /\b(cancelled|canceled|cancel|changed|rescheduled|wrong date|double[- ]booked|not booked|missing|incorrect|error|mistake|confirmation|no confirmation|wrong time|time changed|charged|payment|couldn't attend|could not attend)\b|\b(inställt|avbokat|ändrat|ombokat|fel datum|dubbelbokat|saknas|felaktigt|bekräftelse|betalning)\b|أُلغي|ملغي|تغيير الموعد|موعد خاطئ|خطأ في الحجز/iu.test(value);
 }
 
 function extractCallbackTime(value: string): string | null {
-  const match = value.match(/\\b(?:after|at|around)\\s+(\\d{1,2}(?::\\d{2})?\\s*(?:a\\.?m\\.?|p\\.?m\\.?)?)\\b/iu);
-  return match?.[1]?.replace(/\\s+/gu, ' ').trim() ?? null;
+  const match = value.match(/\b(?:after|at|around)\s+(\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)?)\b/iu);
+  return match?.[1]?.replace(/\s+/gu, ' ').trim() ?? null;
 }
 
 export function buildCompletionReply(state: ConversationState, ownerName = 'Yazoniii'): string {
