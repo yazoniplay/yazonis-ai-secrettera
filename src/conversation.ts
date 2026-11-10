@@ -38,7 +38,7 @@ const prompts: Record<SupportedLanguage, Copy> = {
     askAdditionalDetails: 'Of course. What else would you like me to pass along?',
     askPhoneAgain: 'I couldn’t find a phone number in that message. Please enter at least 7 digits; a country code is optional.',
     callbackConfirmation: (owner, phone, name, urgent) => `Thanks${name ? `, ${name}` : ''}. I’ll pass ${owner} your name, the reason for your call, and your callback number (${phone}).${urgent ? ' I’ve marked the message urgent.' : ''}`,
-    completedMessage: (owner, name, urgent, message, phone, callback) => `Thanks${name ? `, ${name}` : ''}. Here is exactly what I will send ${owner}: Caller: ${name || 'Name not provided'}. Phone: ${phone || 'Not provided'}. Message: ${message || 'No reason recorded'} | Callback: ${callback === true ? 'Requested' : callback === false ? 'Not requested' : 'Not confirmed'}. Priority: ${urgent ? 'URGENT' : 'Normal'}. Goodbye.`
+    completedMessage: (owner, name, urgent, message, phone, callback) => `Thanks${name ? `, ${name}` : ''}. Here is exactly what I will send ${owner}: Caller: ${name || 'Name not provided'}. Phone: ${phone || 'Not provided'}. Message: ${message || 'No reason recorded'} | Callback: ${callback === true ? `Requested${extractCallbackTime(message || '') ? ` (preferred time: ${extractCallbackTime(message || '')})` : ''}` : callback === false ? 'Not requested' : 'Not confirmed'}. Priority: ${urgent ? 'URGENT' : 'Normal'}. Goodbye.`
   },
   sv: {
     greeting: 'Hej och tack för att du ringer Yazonis Secrettera. Jag kan ta ett meddelande och se till att Yazoniii får informationen.',
@@ -155,7 +155,16 @@ function mentionsCallback(value: string): boolean {
   return /\b(call me back|call back|callback|ring me|ring back|phone me|återkomma|ringa tillbaka|ring mig|معاودة الاتصال|اتصل بي مجدداً)\b/iu.test(value);
 }
 function looksLikeReason(value: string): boolean {
-  return /\b(calling because|calling about|need to speak|problem|issue|appointment|meeting|booking|order|question|wanted to|need help|regarding)\b|\b(gäller|angående|problem|tid|möte|bokning|fråga|hjälp)\b|موعد|مشكلة|اتصل بسبب/iu.test(value);
+  return /\\b(calling because|calling about|need to speak|problem|issue|appointment|meeting|booking|order|question|wanted to|need help|regarding)\\b|\\b(gäller|angående|problem|tid|möte|bokning|fråga|hjälp)\\b|موعد|مشكلة|اتصل بسبب/iu.test(value);
+}
+
+function hasSpecificAppointmentProblem(value: string): boolean {
+  return /\\b(cancelled|canceled|cancel|changed|rescheduled|wrong date|double[- ]booked|not booked|missing|incorrect|error|mistake|confirmation|no confirmation|wrong time|time changed|charged|payment|couldn't attend|could not attend)\\b|\\b(inställt|avbokat|ändrat|ombokat|fel datum|dubbelbokat|saknas|felaktigt|bekräftelse|betalning)\\b|أُلغي|ملغي|تغيير الموعد|موعد خاطئ|خطأ في الحجز/iu.test(value);
+}
+
+function extractCallbackTime(value: string): string | null {
+  const match = value.match(/\\b(?:after|at|around)\\s+(\\d{1,2}(?::\\d{2})?\\s*(?:a\\.?m\\.?|p\\.?m\\.?)?)\\b/iu);
+  return match?.[1]?.replace(/\\s+/gu, ' ').trim() ?? null;
 }
 
 export function buildCompletionReply(state: ConversationState, ownerName = 'Yazoniii'): string {
@@ -225,9 +234,12 @@ export function advanceConversation(current: ConversationState, callerText: stri
     }
     state.message = applyCallerCorrection(state.message, text);
     state.intent = classifyIntent(state.message);
-    if (/\b(?:problem|issue) with (?:an? )?appointment\b/iu.test(state.message)
-      && !/\b(?:cancelled|canceled|changed|rescheduled|wrong date|double[- ]booked|not booked|missing|incorrect|error|mistake|supposed to be|was meant to be)\b/iu.test(state.message)) {
-      return { state, reply: language === 'sv' ? 'Vad har hänt med mötet eller bokningen?' : language === 'ar' ? 'ما المشكلة التي حدثت في الموعد؟' : 'What went wrong with the appointment?', completed: false };
+    if (state.intent === 'appointment' && !hasSpecificAppointmentProblem(state.message || '')) {
+      return { state, reply: language === 'sv'
+        ? 'Vad gick konkret fel med bokningen — avbokades den, ändrades tiden eller hände något annat?'
+        : language === 'ar'
+          ? 'ما الذي حدث تحديداً في الموعد؟ هل أُلغي أم تغيّر الوقت أم حدث شيء آخر؟'
+          : 'What specifically went wrong with the appointment — was it cancelled, was the time changed, or something else?', completed: false };
     }
     state.stage = 'callback';
     return { state, reply: copy.askCallback(ownerName, Boolean(state.callerPhone), state.priority === 'urgent'), completed: false };
