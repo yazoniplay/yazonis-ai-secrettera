@@ -35,7 +35,7 @@ describe('receptionist conversation', () => {
     expect(turn.reply).toContain('Yazoniii');
     turn = advanceConversation(turn.state, '123');
     expect(turn.state.stage).toBe('phone');
-    expect(turn.reply).toContain('complete number');
+    expect(turn.reply).toContain('I couldn’t find a phone number');
     turn = advanceConversation(turn.state, '+46701234567');
     expect(turn.completed).toBe(false);
     expect(turn.state.stage).toBe('anything_else');
@@ -172,7 +172,7 @@ describe('receptionist conversation', () => {
     turn = advanceConversation(turn.state, 'Alex');
     turn = advanceConversation(turn.state, 'I have a problem with an appointment.');
     expect(turn.state.stage).toBe('reason');
-    expect(turn.reply).toContain('What went wrong');
+    expect(turn.reply).toContain('What specifically went wrong');
     turn = advanceConversation(turn.state, 'It was supposed to be tomorrow, but I think something went wrong.');
     expect(turn.state.stage).toBe('reason');
     expect(turn.reply).toContain('What specifically went wrong');
